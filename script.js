@@ -27,6 +27,7 @@ function parseTipend(str) {
 
 // --- Parser do arquivo (ponto e virgula, latin1) ---
 let allRows = null; // { rua, predio, apto, sala, esp, codigo, desc, tipend, pav }
+let currentPavKey = null, currentRows = null;
 
 function parseFile(text) {
   const lines = text.split('\n');
@@ -93,6 +94,8 @@ pavCards.forEach(btn => {
     if (!allRows) return;
     const pav = btn.getAttribute('data-pav');
     const rows = allRows.filter(r => r.pav === pav);
+    currentPavKey = pav;
+    currentRows = rows;
     showScene(pav, rows);
   });
 });
@@ -101,6 +104,39 @@ document.getElementById('btn-back').addEventListener('click', () => {
   document.getElementById('scene-screen').style.display = 'none';
   document.getElementById('select-screen').style.display = 'flex';
   disposeScene();
+});
+
+document.getElementById('btn-save-edits').addEventListener('click', () => {
+  commitProxy();
+  const out = [];
+  manualEdits.forEach((pos, key) => out.push({ key, x: pos.x, y: pos.y, z: pos.z }));
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ajustes_posicoes.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('btn-load-edits').addEventListener('click', () => document.getElementById('edits-file-input').click());
+document.getElementById('edits-file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      manualEdits.clear();
+      data.forEach(item => manualEdits.set(item.key, { x: item.x, y: item.y, z: item.z }));
+      if (currentPavKey && currentRows) {
+        disposeScene();
+        buildLayout(currentPavKey, currentRows);
+      }
+    } catch (err) {
+      alert('Erro ao ler ajustes: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 });
 
 // ============ CENA 3D ============
@@ -139,7 +175,9 @@ function initSceneOnce() {
 
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
-  renderer.domElement.addEventListener('click', onSceneClick);
+  renderer.domElement.addEventListener('pointerdown', onScenePointerDown);
+  renderer.domElement.addEventListener('pointermove', onScenePointerMove);
+  window.addEventListener('pointerup', onScenePointerUp);
   window.addEventListener('resize', onResize);
 
   animate();
@@ -165,6 +203,11 @@ function disposeScene() {
   if (floor) scene.remove(floor);
   const grid = scene.getObjectByName('grid');
   if (grid) scene.remove(grid);
+  const beams = scene.getObjectByName('beams');
+  if (beams) { scene.remove(beams); beams.traverse(o => o.geometry && o.geometry.dispose()); }
+  const cols = scene.getObjectByName('columns');
+  if (cols) { scene.remove(cols); cols.traverse(o => o.geometry && o.geometry.dispose()); }
+  commitProxy();
   apanhaData = []; pulmaoData = [];
   document.getElementById('panel').style.display = 'none';
 }
@@ -211,17 +254,25 @@ function buildLayout(pavKey, rows) {
     if (cur === undefined || r.predio < cur) predioMinByRua.set(r.rua, r.predio);
   });
 
-  // Fallback de altura: ranking de APTO dentro de cada (rua,predio) quando falta TIPEND
-  const aptoRank = new Map(); // key `${rua}_${predio}` -> Map(apto -> index)
+  // Fallback de altura: quando falta TIPEND, usa a media de alturas conhecidas
+  // do mesmo predio, senao da mesma rua, senao um padrao por especie
+  const tipendByBay = new Map(); // rua_predio -> [alturas conhecidas]
+  const tipendByRua = new Map(); // rua -> [alturas conhecidas]
   rows.forEach(r => {
-    const key = r.rua + '_' + r.predio;
-    if (!aptoRank.has(key)) aptoRank.set(key, new Set());
-    aptoRank.get(key).add(r.apto);
+    if (r.tipend === null) return;
+    const bayKey = r.rua + '_' + r.predio;
+    if (!tipendByBay.has(bayKey)) tipendByBay.set(bayKey, []);
+    tipendByBay.get(bayKey).push(r.tipend);
+    if (!tipendByRua.has(r.rua)) tipendByRua.set(r.rua, []);
+    tipendByRua.get(r.rua).push(r.tipend);
   });
-  const aptoRankSorted = new Map();
-  aptoRank.forEach((set, key) => {
-    aptoRankSorted.set(key, Array.from(set).sort((a,b)=>a-b));
-  });
+  function avg(arr) { return arr.reduce((a,b)=>a+b,0) / arr.length; }
+  function fallbackHeight(r) {
+    const bayKey = r.rua + '_' + r.predio;
+    if (tipendByBay.has(bayKey)) return avg(tipendByBay.get(bayKey));
+    if (tipendByRua.has(r.rua)) return avg(tipendByRua.get(r.rua));
+    return r.esp === 'Apanha' ? 0.4 : 2.0;
+  }
 
   apanhaData = [];
   pulmaoData = [];
@@ -231,26 +282,25 @@ function buildLayout(pavKey, rows) {
   const boundsMin = new THREE.Vector3(Infinity,Infinity,Infinity);
   const boundsMax = new THREE.Vector3(-Infinity,-Infinity,-Infinity);
 
-  rows.forEach(r => {
+  rows.forEach((r, rowId) => {
     const zi = ruaIndex.get(r.rua);
     const z = zi * RUA_SPACING;
     const pMin = predioMinByRua.get(r.rua) || 0;
     const x = (r.predio - pMin) * BAY_SPACING;
-    let y;
-    if (r.tipend !== null) {
-      y = r.tipend;
-    } else {
-      const key = r.rua + '_' + r.predio;
-      const order = aptoRankSorted.get(key) || [r.apto];
-      const idx = order.indexOf(r.apto);
-      y = 0.4 + (idx >= 0 ? idx : 0) * FALLBACK_LEVEL_H;
-    }
+    const y = r.tipend !== null ? r.tipend : fallbackHeight(r);
     const zOff = (r.sala % 4) * 0.14;
-    const pos = { x, y, z: z + zOff, addr: `RUA ${r.rua} / PRÉDIO ${r.predio} / APTO ${r.apto} / SALA ${r.sala}`, esp: r.esp, desc: r.desc, codigo: r.codigo };
+    const override = manualEdits.get(pavKey + '_' + rowId);
+    const pos = {
+      x: override ? override.x : x,
+      y: override ? override.y : y,
+      z: override ? override.z : (z + zOff),
+      addr: `RUA ${r.rua} / PRÉDIO ${r.predio} / APTO ${r.apto} / SALA ${r.sala}`,
+      esp: r.esp, desc: r.desc, codigo: r.codigo, rowId, pavKey
+    };
     if (r.esp === 'Apanha') apanhaData.push(pos); else pulmaoData.push(pos);
-    boundsMin.x = Math.min(boundsMin.x, x); boundsMax.x = Math.max(boundsMax.x, x);
-    boundsMin.y = Math.min(boundsMin.y, y); boundsMax.y = Math.max(boundsMax.y, y);
-    boundsMin.z = Math.min(boundsMin.z, z); boundsMax.z = Math.max(boundsMax.z, z);
+    boundsMin.x = Math.min(boundsMin.x, pos.x); boundsMax.x = Math.max(boundsMax.x, pos.x);
+    boundsMin.y = Math.min(boundsMin.y, pos.y); boundsMax.y = Math.max(boundsMax.y, pos.y);
+    boundsMin.z = Math.min(boundsMin.z, pos.z); boundsMax.z = Math.max(boundsMax.z, pos.z);
   });
 
   if (apanhaData.length > 0) {
@@ -270,7 +320,53 @@ function buildLayout(pavKey, rows) {
     scene.add(pulmaoInst);
   }
 
-  // Piso
+  // --- Longarinas: uma por (rua, nivel de altura arredondado) ---
+  const beamGroups = new Map(); // key rua_yRound -> {z, y, minX, maxX}
+  [...apanhaData, ...pulmaoData].forEach(d => {
+    const yRound = Math.round(d.y * 10) / 10;
+    const key = d.z.toFixed(2) + '_' + yRound;
+    if (!beamGroups.has(key)) beamGroups.set(key, { z: d.z, y: yRound, minX: d.x, maxX: d.x });
+    else {
+      const g = beamGroups.get(key);
+      g.minX = Math.min(g.minX, d.x);
+      g.maxX = Math.max(g.maxX, d.x);
+    }
+  });
+  const beamMat = new THREE.MeshStandardMaterial({ color: 0xE2571C, metalness: 0.3, roughness: 0.5 });
+  const beamGroupObj = new THREE.Group();
+  beamGroupObj.name = 'beams';
+  beamGroups.forEach(g => {
+    const len = (g.maxX - g.minX) + 0.5;
+    if (len < 0.3) return;
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, 0.06), beamMat);
+    beam.position.set((g.minX + g.maxX) / 2, g.y - 0.32, g.z);
+    beamGroupObj.add(beam);
+  });
+  scene.add(beamGroupObj);
+
+  // --- Colunas de sustentacao: uma a cada poucos bays por corredor ---
+  const colMat = new THREE.MeshStandardMaterial({ color: 0x1e4d8c, metalness: 0.3, roughness: 0.55 });
+  const colGroupObj = new THREE.Group();
+  colGroupObj.name = 'columns';
+  const colByRuaX = new Map(); // rua_z -> set of x (rounded to bay)
+  [...apanhaData, ...pulmaoData].forEach(d => {
+    const key = d.z.toFixed(2);
+    if (!colByRuaX.has(key)) colByRuaX.set(key, { z: d.z, xs: new Set(), maxY: -Infinity });
+    const g = colByRuaX.get(key);
+    g.xs.add(Math.round(d.x / (BAY_SPACING*3)) * (BAY_SPACING*3));
+    g.maxY = Math.max(g.maxY, d.y);
+  });
+  colByRuaX.forEach(g => {
+    g.xs.forEach(x => {
+      const h = g.maxY + 0.8;
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.06, h, 0.06), colMat);
+      col.position.set(x, h/2 - 0.4, g.z);
+      colGroupObj.add(col);
+    });
+  });
+  scene.add(colGroupObj);
+
+
   const cx = (boundsMin.x + boundsMax.x)/2, cz = (boundsMin.z + boundsMax.z)/2;
   const fw = (boundsMax.x - boundsMin.x) + 8, fd = (boundsMax.z - boundsMin.z) + 8;
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x2f3438, roughness: 0.95 });
@@ -294,22 +390,131 @@ function buildLayout(pavKey, rows) {
   controls.update();
 }
 
-function onSceneClick(event) {
-  if (!apanhaInst && !pulmaoInst) return;
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const targets = [apanhaInst, pulmaoInst].filter(Boolean);
-  const hits = raycaster.intersectObjects(targets);
+// --- Edicao: manualEdits guarda posicoes ajustadas manualmente ---
+const manualEdits = new Map(); // "pavKey_rowId" -> {x,y,z}
+let selectedProxy = null; // { mesh, isApanha, instanceId, data }
+let isDragging = false;
+let pointerDownPos = null;
+const dragPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+const dragOffset = new THREE.Vector3();
+
+function commitProxy() {
+  if (!selectedProxy) return;
+  const { mesh, isApanha, instanceId, data } = selectedProxy;
+  data.x = mesh.position.x; data.y = mesh.position.y; data.z = mesh.position.z;
+  manualEdits.set(data.pavKey + '_' + data.rowId, { x: data.x, y: data.y, z: data.z });
+  const inst = isApanha ? apanhaInst : pulmaoInst;
+  const m = new THREE.Matrix4();
+  m.compose(mesh.position, new THREE.Quaternion(), new THREE.Vector3(1,1,1));
+  inst.setMatrixAt(instanceId, m);
+  inst.instanceMatrix.needsUpdate = true;
+  scene.remove(mesh);
+  mesh.geometry.dispose();
+  selectedProxy = null;
+  document.getElementById('panel').style.display = 'none';
+}
+
+function selectInstance(object, instanceId) {
+  commitProxy();
+  const isApanha = object === apanhaInst;
+  const data = isApanha ? apanhaData[instanceId] : pulmaoData[instanceId];
+  const geo = isApanha ? boxGeo : wrapGeo;
+  const mat = new THREE.MeshStandardMaterial({ color: 0xF2A93B, emissive: 0x3a2400, roughness: 0.5 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(data.x, data.y, data.z);
+  scene.add(mesh);
+  // esconde a instancia original (escala zero)
+  const zeroM = new THREE.Matrix4().compose(new THREE.Vector3(data.x,data.y,data.z), new THREE.Quaternion(), new THREE.Vector3(0,0,0));
+  object.setMatrixAt(instanceId, zeroM);
+  object.instanceMatrix.needsUpdate = true;
+  selectedProxy = { mesh, isApanha, instanceId, data };
+  updatePanel();
+}
+
+function updatePanel() {
+  if (!selectedProxy) return;
+  const { data, mesh } = selectedProxy;
   const panel = document.getElementById('panel');
-  if (hits.length === 0) { panel.style.display = 'none'; return; }
-  const hit = hits[0];
-  const data = hit.object === apanhaInst ? apanhaData[hit.instanceId] : pulmaoData[hit.instanceId];
   panel.style.display = 'block';
   panel.innerHTML =
     '<div class="l">Endereço</div><div class="v">' + data.addr + '</div>' +
     '<div class="l">Espécie</div><div class="v">' + data.esp + '</div>' +
     '<div class="l">Código</div><div class="v">' + (data.codigo || '-') + '</div>' +
-    '<div class="l">Descrição</div><div class="v">' + (data.desc || '(vazio)') + '</div>';
+    '<div class="l">Descrição</div><div class="v">' + (data.desc || '(vazio)') + '</div>' +
+    '<div class="l" style="margin-top:12px">Posição (arraste no chão pra mover X/Z)</div>' +
+    '<div class="edit-row"><label>Y</label><input type="range" id="proxy-y" min="0" max="12" step="0.05" value="' + mesh.position.y.toFixed(2) + '"><span id="proxy-y-out">' + mesh.position.y.toFixed(2) + 'm</span></div>' +
+    '<button id="proxy-done" class="full-btn">Concluir edição</button>';
+  document.getElementById('proxy-y').addEventListener('input', (e) => {
+    mesh.position.y = parseFloat(e.target.value);
+    document.getElementById('proxy-y-out').textContent = parseFloat(e.target.value).toFixed(2) + 'm';
+  });
+  document.getElementById('proxy-done').addEventListener('click', commitProxy);
+}
+
+function screenToMouse(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function onScenePointerDown(event) {
+  if (event.button !== 0) return;
+  pointerDownPos = { x: event.clientX, y: event.clientY };
+  screenToMouse(event);
+  raycaster.setFromCamera(mouse, camera);
+
+  // Se ja existe proxy selecionado, tenta arrastar ele primeiro
+  if (selectedProxy) {
+    const hitsProxy = raycaster.intersectObject(selectedProxy.mesh);
+    if (hitsProxy.length > 0) {
+      dragPlane.constant = -selectedProxy.mesh.position.y;
+      const hp = new THREE.Vector3();
+      raycaster.ray.intersectPlane(dragPlane, hp);
+      dragOffset.copy(selectedProxy.mesh.position).sub(hp);
+      isDragging = true;
+      controls.enabled = false;
+      return;
+    }
+  }
+
+  const targets = [apanhaInst, pulmaoInst].filter(Boolean);
+  const hits = raycaster.intersectObjects(targets);
+  if (hits.length > 0) {
+    selectInstance(hits[0].object, hits[0].instanceId);
+    dragPlane.constant = -selectedProxy.mesh.position.y;
+    const hp = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, hp);
+    dragOffset.copy(selectedProxy.mesh.position).sub(hp);
+    isDragging = true;
+    controls.enabled = false;
+  }
+}
+
+function onScenePointerMove(event) {
+  if (!isDragging || !selectedProxy) return;
+  screenToMouse(event);
+  raycaster.setFromCamera(mouse, camera);
+  const hp = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(dragPlane, hp)) {
+    selectedProxy.mesh.position.x = hp.x + dragOffset.x;
+    selectedProxy.mesh.position.z = hp.z + dragOffset.z;
+  }
+}
+
+function onScenePointerUp(event) {
+  if (isDragging) {
+    isDragging = false;
+    controls.enabled = true;
+  } else if (pointerDownPos) {
+    const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
+    if (moved < 4 && selectedProxy) {
+      screenToMouse(event);
+      raycaster.setFromCamera(mouse, camera);
+      const hitsProxy = raycaster.intersectObject(selectedProxy.mesh);
+      const targets = [apanhaInst, pulmaoInst].filter(Boolean);
+      const hits = raycaster.intersectObjects(targets);
+      if (hitsProxy.length === 0 && hits.length === 0) commitProxy();
+    }
+  }
+  pointerDownPos = null;
 }
