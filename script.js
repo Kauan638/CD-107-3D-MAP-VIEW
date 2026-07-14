@@ -29,13 +29,31 @@ controls.minDistance = 12;
 controls.maxDistance = 160;
 controls.maxPolarAngle = Math.PI * 0.49;
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-const key = new THREE.DirectionalLight(0xffffff, 0.7);
+scene.add(new THREE.HemisphereLight(0x9fb8d9, 0x1a1d20, 0.9));
+const key = new THREE.DirectionalLight(0xfff2df, 0.85);
 key.position.set(40, 60, 30);
 scene.add(key);
-scene.add(new THREE.DirectionalLight(0x8fb4e0, 0.3));
+const rim = new THREE.DirectionalLight(0x6f9fd8, 0.4);
+rim.position.set(-30, 20, -40);
+scene.add(rim);
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x2f3438, roughness: 0.95 });
+function makeFloorTexture() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#33383d'; g.fillRect(0,0,256,256);
+  for (let i=0; i<900; i++) {
+    g.fillStyle = `rgba(${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()*0.03})`;
+    g.fillRect(Math.random()*256, Math.random()*256, 2, 2);
+  }
+  g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2;
+  g.strokeRect(0,0,256,256);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(10, 6);
+  return t;
+}
+const floorMat = new THREE.MeshStandardMaterial({ map: makeFloorTexture(), roughness: 0.92 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(BW+20, BD+20), floorMat);
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
@@ -64,20 +82,78 @@ function addLabel(text, x, y, z, color) {
   scene.add(sprite);
 }
 
-// Textura simples para caixas de apanha (padrao quadriculado, 1 unico mesh por pallet)
+// Textura de caixa de papelao (kraft, com fita e sombreamento sutil)
 function makeBoxTexture() {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
   const g = c.getContext('2d');
-  g.fillStyle = '#B5895A'; g.fillRect(0,0,64,64);
-  g.fillStyle = '#C9A876';
-  g.fillRect(0,0,32,32); g.fillRect(32,32,32,32);
-  g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2;
-  g.strokeRect(1,1,62,62); g.beginPath(); g.moveTo(32,0); g.lineTo(32,64); g.moveTo(0,32); g.lineTo(64,32); g.stroke();
+  const grad = g.createLinearGradient(0,0,0,128);
+  grad.addColorStop(0, '#C9A876'); grad.addColorStop(1, '#AD8A5C');
+  g.fillStyle = grad; g.fillRect(0,0,128,128);
+  g.fillStyle = 'rgba(0,0,0,0.06)';
+  for (let i=0; i<128; i+=4) g.fillRect(0,i,128,1);
+  g.fillStyle = '#8a6d45';
+  g.fillRect(56,0,16,128);
+  g.strokeStyle = 'rgba(0,0,0,0.2)'; g.lineWidth = 3;
+  g.strokeRect(1,1,126,126);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
+// Textura de madeira para pallet
+function makeWoodTexture() {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 32;
+  const g = c.getContext('2d');
+  g.fillStyle = '#8a6a45'; g.fillRect(0,0,128,32);
+  for (let i=0; i<6; i++) {
+    g.fillStyle = i%2===0 ? 'rgba(60,42,24,0.25)' : 'rgba(160,124,80,0.2)';
+    g.fillRect(0, i*5.3, 128, 2);
+  }
+  g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2;
+  g.strokeRect(0,0,128,32);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2,1);
+  return t;
+}
+// Textura de plastico stretch (filme semi-transparente com brilho diagonal)
+function makeWrapTexture() {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#DCCFA8'; g.fillRect(0,0,128,128);
+  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 4;
+  for (let i=-128; i<128; i+=18) { g.beginPath(); g.moveTo(i,128); g.lineTo(i+128,0); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  return t;
+}
+// Textura de viga (longarina) com friso de reforco
+function makeBeamTexture() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 32;
+  const g = c.getContext('2d');
+  g.fillStyle = '#E2571C'; g.fillRect(0,0,64,32);
+  g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(0,4,64,3);
+  g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0,25,64,3);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+// Textura de coluna azul (com furos tipicos de porta-pallet)
+function makeUprightTexture() {
+  const c = document.createElement('canvas'); c.width = 32; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1e4d8c'; g.fillRect(0,0,32,128);
+  g.fillStyle = 'rgba(0,0,0,0.35)';
+  for (let i=6; i<128; i+=14) g.fillRect(13,i,6,4);
+  g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(2,0,3,128);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1,3);
+  return t;
+}
 const boxTexture = makeBoxTexture();
+const woodTexture = makeWoodTexture();
+const wrapTexture = makeWrapTexture();
+const beamTexture = makeBeamTexture();
+const uprightTexture = makeUprightTexture();
 
 // --- ZONA SORTER ---
 addZone(6, 2, BW-16, 8, 0x3a3020, 0.15);
@@ -102,13 +178,13 @@ scene.add(belt);
 addLabel('SORTER', -BW/2 + 40, 5, -BD/2 + 5, '#F2A93B');
 
 // --- ESTRUTURA DE RACKS (instanciada) ---
-const blueMat = new THREE.MeshStandardMaterial({ color: 0x1e4d8c, metalness: 0.4, roughness: 0.5 });
-const orangeMat = new THREE.MeshStandardMaterial({ color: 0xE2571C, metalness: 0.3, roughness: 0.5 });
-const wrapMat = new THREE.MeshStandardMaterial({ color: 0xD8C9A3, roughness: 0.6, transparent:true, opacity:0.92 });
-const boxMat = new THREE.MeshStandardMaterial({ map: boxTexture, roughness: 0.85 });
-const palletMat = new THREE.MeshStandardMaterial({ color: 0x2a5aa0, roughness: 0.7 });
-const beamGeo = new THREE.BoxGeometry(0.1, 0.14, 1);
-const uprightGeo = new THREE.BoxGeometry(0.12, 1, 0.12);
+const blueMat = new THREE.MeshStandardMaterial({ map: uprightTexture, color: 0xffffff, metalness: 0.3, roughness: 0.55 });
+const orangeMat = new THREE.MeshStandardMaterial({ map: beamTexture, color: 0xffffff, metalness: 0.25, roughness: 0.5 });
+const wrapMat = new THREE.MeshStandardMaterial({ map: wrapTexture, roughness: 0.35, metalness: 0.05, transparent:true, opacity:0.94 });
+const boxMat = new THREE.MeshStandardMaterial({ map: boxTexture, roughness: 0.9 });
+const palletMat = new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.95 });
+const beamGeo = new THREE.BoxGeometry(0.14, 0.22, 1);
+const uprightGeo = new THREE.BoxGeometry(0.14, 1, 0.14);
 
 const uprightMatrices = [];
 const beamData = []; // { mesh, baseY, x, z, bayRef }
@@ -120,14 +196,25 @@ function addUpright(x, z, h) {
   uprightMatrices.push(m);
 }
 
+function makePalletBase() {
+  const group = new THREE.Group();
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.05, 0.85), palletMat);
+  deck.position.y = 0.1;
+  group.add(deck);
+  for (let i=0; i<4; i++) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.09, 0.13), palletMat);
+    slat.position.set(0, 0.045, -0.36 + i*0.24);
+    group.add(slat);
+  }
+  return group;
+}
+
 function makePulmaoPallet(cubagemCm) {
   const group = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.12, 0.85), palletMat);
-  base.position.y = 0.06;
-  group.add(base);
+  group.add(makePalletBase());
   const h = Math.max(0.3, cubagemCm / 100);
   const wrap = new THREE.Mesh(new THREE.BoxGeometry(1.0, h, 0.8), wrapMat);
-  wrap.position.y = 0.12 + h/2;
+  wrap.position.y = 0.13 + h/2;
   wrap.name = 'wrap';
   group.add(wrap);
   group.userData.cubagem = cubagemCm;
@@ -135,11 +222,9 @@ function makePulmaoPallet(cubagemCm) {
 }
 function makeApanhaPallet() {
   const group = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.12, 0.85), palletMat);
-  base.position.y = 0.06;
-  group.add(base);
+  group.add(makePalletBase());
   const box = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.6, 0.76), boxMat);
-  box.position.y = 0.12 + 0.3;
+  box.position.y = 0.13 + 0.3;
   box.name = 'box';
   group.add(box);
   return group;
