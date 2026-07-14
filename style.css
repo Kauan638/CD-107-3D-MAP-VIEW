@@ -29,10 +29,22 @@ canvas { display:block; }
 #panel {
   position:absolute; bottom:16px; right:16px; z-index:10;
   font-family:'JetBrains Mono',monospace; font-size:12px; color:#3DCB82;
-  background:rgba(20,24,28,0.9); border:1px solid #2A3138; border-radius:8px; padding:10px 14px;
-  min-width:180px; display:none;
+  background:rgba(20,24,28,0.95); border:1px solid #2A3138; border-radius:8px; padding:14px 16px;
+  min-width:230px; display:none;
 }
-#panel .label { color:#7C8894; font-size:10px; text-transform:uppercase; }
+#panel .label { color:#7C8894; font-size:10px; text-transform:uppercase; font-family:'Inter',Arial,sans-serif; }
+#panel .panel-head { display:flex; justify-content:space-between; align-items:flex-start; }
+#panel .icon-btn { background:none; border:1px solid #333B42; color:#B7B5AC; width:22px; height:22px; border-radius:4px; cursor:pointer; font-size:14px; line-height:1; }
+#panel .icon-btn:hover { border-color:#E8564F; color:#E8564F; }
+#panel .edit-row { display:flex; align-items:center; gap:8px; margin-top:12px; }
+#panel .edit-row label { flex:0 0 110px; color:#B7B5AC; font-family:'Inter',Arial,sans-serif; font-size:11px; }
+#panel .edit-row input[type=range] { flex:1; accent-color:#F2A93B; }
+#panel .edit-row span { flex:0 0 50px; text-align:right; font-size:11px; }
+#panel .full-btn {
+  width:100%; margin-top:14px; padding:8px; background:#1F262C; border:1px solid #333B42;
+  color:#F2A93B; border-radius:6px; cursor:pointer; font-family:'Inter',Arial,sans-serif; font-size:12px;
+}
+#panel .full-btn:hover { border-color:#F2A93B; }
 
 #error-msg {
   position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);

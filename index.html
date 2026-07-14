@@ -2,14 +2,14 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Modelo 3D - Corredor CD</title>
-<link rel="stylesheet" href="style.css?v=1">
+<title>Modelo 3D - CD (Projeto 15)</title>
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 <div id="app">
   <div id="hud">
     <h1>MODELO 3D — LAYOUT GERAL CD</h1>
-    <p>Massing reconstruído a partir da planta do projeto: sorter, racks principais, docas e pátio de cross-dock. Proporções aproximadas — ainda não é a planta em escala real.</p>
+    <p>Massing reconstruído a partir da planta do projeto. Clique num pallet pra editar posição da longarina, cubagem e trocar tipo de posição.</p>
     <span class="tag" id="hover-tag">clique num pallet</span>
   </div>
   <div id="legend">
@@ -18,17 +18,34 @@
     <div class="row"><div class="sw" style="background:#E8564F"></div>Docas</div>
     <div class="row"><div class="sw" style="background:#3DCB82"></div>Pátio / cross-dock</div>
   </div>
-  <div id="controls">arraste: girar · scroll: zoom · botão direito: pan · clique num pallet: detalhes</div>
+  <div id="controls">arraste: girar · scroll: zoom · botão direito: pan · clique num pallet: editar</div>
   <div id="panel">
-    <div class="label">Endereço</div>
-    <div id="panel-addr">-</div>
+    <div class="panel-head">
+      <div>
+        <div class="label">Endereço</div>
+        <div id="panel-addr">-</div>
+      </div>
+      <button id="edit-close" class="icon-btn">×</button>
+    </div>
     <div class="label" style="margin-top:6px">Nível</div>
     <div id="panel-level">-</div>
+
+    <div class="edit-row">
+      <label>Altura da longarina</label>
+      <input type="range" id="edit-y" min="0" max="7" step="0.05" value="0">
+      <span id="edit-y-out">-</span>
+    </div>
+    <div class="edit-row" id="edit-cub-row">
+      <label>Cubagem (pulmão)</label>
+      <input type="range" id="edit-cub" min="30" max="220" step="5" value="90">
+      <span id="edit-cub-out">-</span>
+    </div>
+    <button id="edit-swap" class="full-btn">Trocar apanha ↔ pulmão</button>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="script.js?v=1"></script>
+<script src="script.js?v=2"></script>
 </body>
 </html>
