@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Modelo 3D - Corredor CD</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <h1>MODELO 3D — CORREDOR CD</h1>
+    <p>Estrutura de porta-pallets reconstruída a partir das fotos reais do corredor. Azul = colunas, laranja = longarinas, nível superior = pulmão, nível inferior = apanha.</p>
+    <span class="tag" id="hover-tag">clique numa posição</span>
+  </div>
+  <div id="legend">
+    <div class="row"><div class="sw" style="background:#4C8FD1"></div>Estrutura (coluna)</div>
+    <div class="row"><div class="sw" style="background:#E2571C"></div>Longarina (viga)</div>
+    <div class="row"><div class="sw" style="background:#D8C9A3"></div>Pallet / pulmão</div>
+    <div class="row"><div class="sw" style="background:#B5895A"></div>Caixa / apanha</div>
+  </div>
+  <div id="controls">arraste: girar · scroll: zoom · botão direito: pan · clique num pallet: detalhes</div>
+  <div id="panel">
+    <div class="label">Endereço</div>
+    <div id="panel-addr">-</div>
+    <div class="label" style="margin-top:6px">Nível</div>
+    <div id="panel-level">-</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="script.js?v=1"></script>
+</body>
+</html>

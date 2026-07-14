@@ -1,0 +1,41 @@
+html, body { margin:0; padding:0; overflow:hidden; background:#14181C; height:100%; }
+#app { position:relative; width:100vw; height:100vh; }
+canvas { display:block; }
+
+#hud {
+  position:absolute; top:16px; left:16px; z-index:10;
+  font-family: 'Inter', Arial, sans-serif; color:#E7E6E1;
+  background:rgba(20,24,28,0.85); border:1px solid #2A3138; border-radius:8px;
+  padding:14px 18px; max-width:290px; backdrop-filter: blur(4px);
+}
+#hud h1 { font-family:'Oswald',Arial,sans-serif; font-size:16px; margin:0 0 6px; color:#F2A93B; letter-spacing:0.5px; }
+#hud p { font-size:12px; margin:4px 0; color:#B7B5AC; line-height:1.5; }
+#hud .tag { display:inline-block; background:#1F262C; border:1px solid #333B42; color:#F2A93B; font-family:'JetBrains Mono',monospace; font-size:11px; padding:2px 6px; border-radius:4px; margin-top:6px; }
+
+#controls {
+  position:absolute; bottom:16px; left:16px; z-index:10;
+  font-family:'Inter',Arial,sans-serif; font-size:11px; color:#7C8894;
+  background:rgba(20,24,28,0.75); border:1px solid #2A3138; border-radius:8px; padding:10px 14px;
+}
+
+#legend {
+  position:absolute; top:16px; right:16px; z-index:10;
+  font-family:'Inter',Arial,sans-serif; font-size:12px; color:#E7E6E1;
+  background:rgba(20,24,28,0.85); border:1px solid #2A3138; border-radius:8px; padding:12px 16px;
+}
+#legend .row { display:flex; align-items:center; gap:8px; margin:5px 0; }
+#legend .sw { width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+
+#panel {
+  position:absolute; bottom:16px; right:16px; z-index:10;
+  font-family:'JetBrains Mono',monospace; font-size:12px; color:#3DCB82;
+  background:rgba(20,24,28,0.9); border:1px solid #2A3138; border-radius:8px; padding:10px 14px;
+  min-width:180px; display:none;
+}
+#panel .label { color:#7C8894; font-size:10px; text-transform:uppercase; }
+
+#error-msg {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  color:#E8564F; font-family:monospace; font-size:13px; background:#14181C;
+  padding:16px 20px; border:1px solid #E8564F; border-radius:8px; max-width:80%;
+}
