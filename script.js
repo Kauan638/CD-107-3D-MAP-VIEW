@@ -1,4 +1,4 @@
-/* Projeto 15 - Modelo 3D editavel do CD (base inicial) */
+/* Projeto 15 - Editor 3D livre do CD */
 window.addEventListener('error', function(e) {
   var el = document.getElementById('app');
   var msg = document.createElement('div');
@@ -10,22 +10,20 @@ window.addEventListener('error', function(e) {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x14181C);
 
-const BW = 90, BD = 50;
-
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 500);
-camera.position.set(60, 45, 70);
+camera.position.set(20, 16, 24);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-renderer.shadowMap.enabled = false; // sombras desligadas: era a principal causa da travada
+renderer.shadowMap.enabled = false;
 document.getElementById('app').appendChild(renderer.domElement);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.1;
-controls.target.set(0, 2, 0);
-controls.minDistance = 12;
+controls.target.set(0, 1, 0);
+controls.minDistance = 3;
 controls.maxDistance = 160;
 controls.maxPolarAngle = Math.PI * 0.49;
 
@@ -38,51 +36,7 @@ rim.position.set(-30, 20, -40);
 scene.add(rim);
 scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
-function makeFloorTexture() {
-  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = '#33383d'; g.fillRect(0,0,256,256);
-  for (let i=0; i<900; i++) {
-    g.fillStyle = `rgba(${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()*0.03})`;
-    g.fillRect(Math.random()*256, Math.random()*256, 2, 2);
-  }
-  g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2;
-  g.strokeRect(0,0,256,256);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(10, 6);
-  return t;
-}
-const floorMat = new THREE.MeshStandardMaterial({ map: makeFloorTexture(), roughness: 0.92 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(BW+20, BD+20), floorMat);
-floor.rotation.x = -Math.PI/2;
-scene.add(floor);
-scene.add(new THREE.GridHelper(BW+20, 30, 0x262c31, 0x1e2327));
-
-function addZone(x0, z0, x1, z1, color, height) {
-  const w = x1 - x0, d = z1 - z0;
-  const cx = -BW/2 + (x0 + x1)/2, cz = -BD/2 + (z0 + z1)/2;
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), new THREE.MeshStandardMaterial({ color, roughness: 0.85 }));
-  mesh.position.set(cx, height/2 + 0.02, cz);
-  scene.add(mesh);
-}
-
-function addLabel(text, x, y, z, color) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgba(20,24,28,0.85)'; ctx.fillRect(0,0,256,64);
-  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(1,1,254,62);
-  ctx.fillStyle = color; ctx.font = '600 22px Arial';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, 128, 32);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
-  sprite.scale.set(9, 2.25, 1);
-  sprite.position.set(x, y, z);
-  scene.add(sprite);
-}
-
-// Textura de caixa de papelao (kraft, com fita e sombreamento sutil)
+// --- Texturas procedurais ---
 function makeBoxTexture() {
   const c = document.createElement('canvas'); c.width = 128; c.height = 128;
   const g = c.getContext('2d');
@@ -91,15 +45,11 @@ function makeBoxTexture() {
   g.fillStyle = grad; g.fillRect(0,0,128,128);
   g.fillStyle = 'rgba(0,0,0,0.06)';
   for (let i=0; i<128; i+=4) g.fillRect(0,i,128,1);
-  g.fillStyle = '#8a6d45';
-  g.fillRect(56,0,16,128);
-  g.strokeStyle = 'rgba(0,0,0,0.2)'; g.lineWidth = 3;
-  g.strokeRect(1,1,126,126);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  g.fillStyle = '#8a6d45'; g.fillRect(56,0,16,128);
+  g.strokeStyle = 'rgba(0,0,0,0.2)'; g.lineWidth = 3; g.strokeRect(1,1,126,126);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
-// Textura de madeira para pallet
 function makeWoodTexture() {
   const c = document.createElement('canvas'); c.width = 128; c.height = 32;
   const g = c.getContext('2d');
@@ -108,35 +58,27 @@ function makeWoodTexture() {
     g.fillStyle = i%2===0 ? 'rgba(60,42,24,0.25)' : 'rgba(160,124,80,0.2)';
     g.fillRect(0, i*5.3, 128, 2);
   }
-  g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2;
-  g.strokeRect(0,0,128,32);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(2,1);
+  g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2; g.strokeRect(0,0,128,32);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,1);
   return t;
 }
-// Textura de plastico stretch (filme semi-transparente com brilho diagonal)
 function makeWrapTexture() {
   const c = document.createElement('canvas'); c.width = 128; c.height = 128;
   const g = c.getContext('2d');
   g.fillStyle = '#DCCFA8'; g.fillRect(0,0,128,128);
   g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 4;
   for (let i=-128; i<128; i+=18) { g.beginPath(); g.moveTo(i,128); g.lineTo(i+128,0); g.stroke(); }
-  const t = new THREE.CanvasTexture(c);
-  return t;
+  return new THREE.CanvasTexture(c);
 }
-// Textura de viga (longarina) com friso de reforco
 function makeBeamTexture() {
   const c = document.createElement('canvas'); c.width = 64; c.height = 32;
   const g = c.getContext('2d');
   g.fillStyle = '#E2571C'; g.fillRect(0,0,64,32);
   g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(0,4,64,3);
   g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0,25,64,3);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = THREE.RepeatWrapping;
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping;
   return t;
 }
-// Textura de coluna azul (com furos tipicos de porta-pallet)
 function makeUprightTexture() {
   const c = document.createElement('canvas'); c.width = 32; c.height = 128;
   const g = c.getContext('2d');
@@ -144,57 +86,56 @@ function makeUprightTexture() {
   g.fillStyle = 'rgba(0,0,0,0.35)';
   for (let i=6; i<128; i+=14) g.fillRect(13,i,6,4);
   g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(2,0,3,128);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(1,3);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1,3);
   return t;
 }
+function makeFloorTexture() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#33383d'; g.fillRect(0,0,256,256);
+  for (let i=0; i<900; i++) {
+    g.fillStyle = `rgba(${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()*0.03})`;
+    g.fillRect(Math.random()*256, Math.random()*256, 2, 2);
+  }
+  g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2; g.strokeRect(0,0,256,256);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(20,20);
+  return t;
+}
+function makeWallTexture() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#4a5158'; g.fillRect(0,0,64,64);
+  g.strokeStyle = 'rgba(0,0,0,0.2)'; g.lineWidth = 2;
+  g.strokeRect(0,0,64,32); g.strokeRect(0,32,64,32);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 const boxTexture = makeBoxTexture();
 const woodTexture = makeWoodTexture();
 const wrapTexture = makeWrapTexture();
 const beamTexture = makeBeamTexture();
 const uprightTexture = makeUprightTexture();
+const wallTexture = makeWallTexture();
 
-// --- ZONA SORTER ---
-addZone(6, 2, BW-16, 8, 0x3a3020, 0.15);
-const chuteMat = new THREE.MeshStandardMaterial({ color: 0xF2A93B });
-const chuteGeo = new THREE.BoxGeometry(1, 1.4, 5.2);
-function buildSorterBank(xStart, xEnd, nLanes) {
-  const laneW = (xEnd - xStart) / nLanes;
-  const inst = new THREE.InstancedMesh(chuteGeo, chuteMat, nLanes);
-  const m = new THREE.Matrix4();
-  for (let i=0; i<nLanes; i++) {
-    const cx = -BW/2 + xStart + laneW*i + laneW*0.5;
-    m.compose(new THREE.Vector3(cx, 0.9, -BD/2 + 5), new THREE.Quaternion(), new THREE.Vector3(laneW*0.72,1,1));
-    inst.setMatrixAt(i, m);
-  }
-  scene.add(inst);
-}
-buildSorterBank(8, 38, 14);
-buildSorterBank(42, 72, 14);
-const belt = new THREE.Mesh(new THREE.BoxGeometry(BW-24, 0.5, 1.6), new THREE.MeshStandardMaterial({ color: 0xb0483a }));
-belt.position.set(0, 1.5, -BD/2 + 9.5);
-scene.add(belt);
-addLabel('SORTER', -BW/2 + 40, 5, -BD/2 + 5, '#F2A93B');
+// --- Chão ---
+const floorMat = new THREE.MeshStandardMaterial({ map: makeFloorTexture(), roughness: 0.92 });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), floorMat);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+scene.add(new THREE.GridHelper(200, 100, 0x2a3138, 0x1e2327));
 
-// --- ESTRUTURA DE RACKS (instanciada) ---
-const blueMat = new THREE.MeshStandardMaterial({ map: uprightTexture, color: 0xffffff, metalness: 0.3, roughness: 0.55 });
-const orangeMat = new THREE.MeshStandardMaterial({ map: beamTexture, color: 0xffffff, metalness: 0.25, roughness: 0.5 });
+// --- Materiais reutilizaveis ---
+const blueMat = new THREE.MeshStandardMaterial({ map: uprightTexture, metalness: 0.3, roughness: 0.55 });
+const orangeMat = new THREE.MeshStandardMaterial({ map: beamTexture, metalness: 0.25, roughness: 0.5 });
 const wrapMat = new THREE.MeshStandardMaterial({ map: wrapTexture, roughness: 0.35, metalness: 0.05, transparent:true, opacity:0.94 });
 const boxMat = new THREE.MeshStandardMaterial({ map: boxTexture, roughness: 0.9 });
 const palletMat = new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.95 });
-const beamGeo = new THREE.BoxGeometry(0.14, 0.22, 1);
-const uprightGeo = new THREE.BoxGeometry(0.14, 1, 0.14);
+const wallMat = new THREE.MeshStandardMaterial({ map: wallTexture, roughness: 0.85 });
+const selectOutlineMat = new THREE.MeshBasicMaterial({ color: 0xF2A93B, wireframe: true });
 
-const uprightMatrices = [];
-const beamData = []; // { mesh, baseY, x, z, bayRef }
-const bays = []; // dados editaveis: { pulmaoMesh, apanhaMesh, beamMesh, levelY, cubagem, kind, x, z }
-
-function addUpright(x, z, h) {
-  const m = new THREE.Matrix4();
-  m.compose(new THREE.Vector3(x, h/2, z), new THREE.Quaternion(), new THREE.Vector3(1, h, 1));
-  uprightMatrices.push(m);
-}
+// ============ FABRICAS DE OBJETOS ============
+let idCounter = 1;
 
 function makePalletBase() {
   const group = new THREE.Group();
@@ -209,206 +150,393 @@ function makePalletBase() {
   return group;
 }
 
-function makePulmaoPallet(cubagemCm) {
-  const group = new THREE.Group();
-  group.add(makePalletBase());
-  const h = Math.max(0.3, cubagemCm / 100);
-  const wrap = new THREE.Mesh(new THREE.BoxGeometry(1.0, h, 0.8), wrapMat);
-  wrap.position.y = 0.13 + h/2;
-  wrap.name = 'wrap';
-  group.add(wrap);
-  group.userData.cubagem = cubagemCm;
-  return group;
-}
-function makeApanhaPallet() {
-  const group = new THREE.Group();
-  group.add(makePalletBase());
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.6, 0.76), boxMat);
-  box.position.y = 0.13 + 0.3;
-  box.name = 'box';
-  group.add(box);
-  return group;
+const FACTORIES = {
+  coluna: () => {
+    const h = 3;
+    const g = new THREE.Group();
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, h, 0.14), blueMat);
+    m.position.y = h/2;
+    g.add(m);
+    g.userData.dims = { h };
+    return g;
+  },
+  longarina: () => {
+    const len = 2.4;
+    const g = new THREE.Group();
+    const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, 0.12), orangeMat);
+    g.add(m);
+    g.userData.dims = { len };
+    return g;
+  },
+  palletPulmao: () => {
+    const cub = 100;
+    const g = makePalletBase();
+    const h = cub/100;
+    const wrap = new THREE.Mesh(new THREE.BoxGeometry(1.0, h, 0.8), wrapMat);
+    wrap.position.y = 0.13 + h/2;
+    wrap.name = 'wrap';
+    g.add(wrap);
+    g.userData.cubagem = cub;
+    return g;
+  },
+  palletApanha: () => {
+    const g = makePalletBase();
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.6, 0.76), boxMat);
+    box.position.y = 0.13 + 0.3;
+    box.name = 'box';
+    g.add(box);
+    return g;
+  },
+  caixa: () => {
+    const g = new THREE.Group();
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), boxMat);
+    m.position.y = 0.25;
+    g.add(m);
+    g.userData.dims = { w:0.6, h:0.5, d:0.5 };
+    return g;
+  },
+  parede: () => {
+    const len = 6;
+    const g = new THREE.Group();
+    const m = new THREE.Mesh(new THREE.BoxGeometry(len, 3, 0.2), wallMat);
+    m.position.y = 1.5;
+    g.add(m);
+    g.userData.dims = { len };
+    return g;
+  }
+};
+
+const objects = []; // { id, type, root }
+
+function addObject(type, pos) {
+  const factory = FACTORIES[type];
+  if (!factory) return null;
+  const root = factory();
+  root.userData.id = idCounter++;
+  root.userData.type = type;
+  root.userData.isEditable = true;
+  const p = pos || new THREE.Vector3((Math.random()-0.5)*4, 0, (Math.random()-0.5)*4);
+  root.position.copy(p);
+  scene.add(root);
+  const entry = { id: root.userData.id, type, root };
+  objects.push(entry);
+  return entry;
 }
 
-function buildStorageRows(x0, x1, z0, z1, nRows, levels) {
-  const rowSpan = (x1 - x0) / nRows;
-  const colH = levels[levels.length-1] + 1.8;
-  const zStart = -BD/2 + z0, zEnd = -BD/2 + z1;
-  const nSeg = 6;
-  for (let r=0; r<nRows; r++) {
-    const rx = -BW/2 + x0 + rowSpan*r + rowSpan*0.5;
-    for (let s=0; s<=nSeg; s++) {
-      const z = zStart + ((zEnd-zStart)/nSeg)*s;
-      addUpright(rx - 0.45, z, colH);
-      addUpright(rx + 0.45, z, colH);
-    }
-    levels.forEach((y) => {
-      const beamLen = zEnd - zStart;
-      const g1 = new THREE.Mesh(beamGeo, orangeMat);
-      g1.scale.set(1, 1, beamLen);
-      g1.position.set(rx - 0.45, y + 0.6, (zStart+zEnd)/2);
-      scene.add(g1);
-      const g2 = g1.clone(); g2.position.x = rx + 0.45; scene.add(g2);
-    });
-    for (let s=0; s<nSeg; s++) {
-      const z = zStart + ((zEnd-zStart)/nSeg)*s + ((zEnd-zStart)/nSeg)*0.5;
-      levels.forEach((y, li) => {
-        const isPulmao = li === levels.length - 1;
-        const cubagem = 90 + Math.round(Math.random()*40);
-        const pallet = isPulmao ? makePulmaoPallet(cubagem) : makeApanhaPallet();
-        pallet.position.set(rx, y + 0.8, z);
-        pallet.userData.addr = `R${r+1}.N${li+1}.V${s+1}`;
-        pallet.userData.kind = isPulmao ? 'pulmao' : 'apanha';
-        pallet.userData.levelY = y;
-        pallet.userData.baseSlotY = y;
-        scene.add(pallet);
-        bays.push(pallet);
+function removeObject(entry) {
+  scene.remove(entry.root);
+  const idx = objects.indexOf(entry);
+  if (idx >= 0) objects.splice(idx, 1);
+  if (selected === entry) deselect();
+}
+
+function duplicateObject(entry) {
+  const clone = entry.root.clone(true);
+  clone.userData.id = idCounter++;
+  clone.position.x += 1.0;
+  clone.position.z += 1.0;
+  scene.add(clone);
+  const newEntry = { id: clone.userData.id, type: entry.type, root: clone };
+  objects.push(newEntry);
+  return newEntry;
+}
+
+// ============ SELECAO / OUTLINE ============
+let selected = null;
+let outlineHelper = null;
+
+function makeOutline(root) {
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const geo = new THREE.BoxGeometry(size.x*1.08 || 0.2, size.y*1.08 || 0.2, size.z*1.08 || 0.2);
+  const mesh = new THREE.Mesh(geo, selectOutlineMat);
+  mesh.position.copy(center);
+  return mesh;
+}
+
+function select(entry) {
+  deselect();
+  selected = entry;
+  outlineHelper = makeOutline(entry.root);
+  scene.add(outlineHelper);
+  document.getElementById('btn-dup').disabled = false;
+  document.getElementById('btn-del').disabled = false;
+  showPanel(entry);
+}
+
+function deselect() {
+  if (outlineHelper) { scene.remove(outlineHelper); outlineHelper = null; }
+  selected = null;
+  document.getElementById('btn-dup').disabled = true;
+  document.getElementById('btn-del').disabled = true;
+  document.getElementById('panel').style.display = 'none';
+}
+
+function refreshOutline() {
+  if (!selected || !outlineHelper) return;
+  const box = new THREE.Box3().setFromObject(selected.root);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  outlineHelper.geometry.dispose();
+  outlineHelper.geometry = new THREE.BoxGeometry(size.x*1.08 || 0.2, size.y*1.08 || 0.2, size.z*1.08 || 0.2);
+  outlineHelper.position.copy(center);
+}
+
+// ============ PAINEL LATERAL ============
+const panel = document.getElementById('panel');
+const typeLabels = { coluna:'COLUNA', longarina:'LONGARINA', palletPulmao:'PALLET PULMÃO', palletApanha:'PALLET APANHA', caixa:'CAIXA', parede:'PAREDE' };
+
+function showPanel(entry) {
+  panel.style.display = 'block';
+  document.getElementById('panel-type').textContent = typeLabels[entry.type] + ' #' + entry.id;
+  document.getElementById('p-x').value = entry.root.position.x;
+  document.getElementById('p-x-out').textContent = entry.root.position.x.toFixed(1);
+  document.getElementById('p-y').value = entry.root.position.y;
+  document.getElementById('p-y-out').textContent = entry.root.position.y.toFixed(2);
+  document.getElementById('p-z').value = entry.root.position.z;
+  document.getElementById('p-z-out').textContent = entry.root.position.z.toFixed(1);
+  const rotDeg = THREE.MathUtils.radToDeg(entry.root.rotation.y);
+  document.getElementById('p-rot').value = ((rotDeg % 360) + 360) % 360;
+  document.getElementById('p-rot-out').textContent = Math.round(rotDeg) + '°';
+
+  const rowLen = document.getElementById('row-len');
+  const rowCub = document.getElementById('row-cub');
+  const swapBtn = document.getElementById('edit-swap');
+  rowLen.style.display = 'none'; rowCub.style.display = 'none'; swapBtn.style.display = 'none';
+
+  if (entry.type === 'longarina' || entry.type === 'parede') {
+    rowLen.style.display = 'flex';
+    const len = entry.root.userData.dims.len;
+    document.getElementById('p-len').min = entry.type === 'parede' ? 1 : 0.5;
+    document.getElementById('p-len').max = entry.type === 'parede' ? 20 : 6;
+    document.getElementById('p-len').value = len;
+    document.getElementById('p-len-out').textContent = len.toFixed(1) + 'm';
+  }
+  if (entry.type === 'palletPulmao') {
+    rowCub.style.display = 'flex';
+    const cub = entry.root.userData.cubagem || 100;
+    document.getElementById('p-cub').value = cub;
+    document.getElementById('p-cub-out').textContent = cub + ' cm';
+    swapBtn.style.display = 'block';
+  }
+  if (entry.type === 'palletApanha') {
+    swapBtn.style.display = 'block';
+  }
+}
+
+document.getElementById('p-x').addEventListener('input', e => {
+  if (!selected) return;
+  selected.root.position.x = parseFloat(e.target.value);
+  document.getElementById('p-x-out').textContent = parseFloat(e.target.value).toFixed(1);
+  refreshOutline();
+});
+document.getElementById('p-y').addEventListener('input', e => {
+  if (!selected) return;
+  selected.root.position.y = parseFloat(e.target.value);
+  document.getElementById('p-y-out').textContent = parseFloat(e.target.value).toFixed(2);
+  refreshOutline();
+});
+document.getElementById('p-z').addEventListener('input', e => {
+  if (!selected) return;
+  selected.root.position.z = parseFloat(e.target.value);
+  document.getElementById('p-z-out').textContent = parseFloat(e.target.value).toFixed(1);
+  refreshOutline();
+});
+document.getElementById('p-rot').addEventListener('input', e => {
+  if (!selected) return;
+  const deg = parseFloat(e.target.value);
+  selected.root.rotation.y = THREE.MathUtils.degToRad(deg);
+  document.getElementById('p-rot-out').textContent = Math.round(deg) + '°';
+  refreshOutline();
+});
+document.getElementById('p-len').addEventListener('input', e => {
+  if (!selected) return;
+  const len = parseFloat(e.target.value);
+  selected.root.userData.dims.len = len;
+  const mesh = selected.root.children[0];
+  mesh.geometry.dispose();
+  if (selected.type === 'longarina') {
+    mesh.geometry = new THREE.BoxGeometry(len, 0.2, 0.12);
+  } else {
+    mesh.geometry = new THREE.BoxGeometry(len, 3, 0.2);
+  }
+  document.getElementById('p-len-out').textContent = len.toFixed(1) + 'm';
+  refreshOutline();
+});
+document.getElementById('p-cub').addEventListener('input', e => {
+  if (!selected || selected.type !== 'palletPulmao') return;
+  const cm = parseFloat(e.target.value);
+  selected.root.userData.cubagem = cm;
+  document.getElementById('p-cub-out').textContent = cm + ' cm';
+  const wrap = selected.root.getObjectByName('wrap');
+  if (wrap) {
+    const h = Math.max(0.3, cm/100);
+    wrap.geometry.dispose();
+    wrap.geometry = new THREE.BoxGeometry(1.0, h, 0.8);
+    wrap.position.y = 0.13 + h/2;
+  }
+  refreshOutline();
+});
+document.getElementById('edit-swap').addEventListener('click', () => {
+  if (!selected) return;
+  const pos = selected.root.position.clone();
+  const rotY = selected.root.rotation.y;
+  const wasType = selected.type;
+  removeObject(selected);
+  const novo = addObject(wasType === 'palletPulmao' ? 'palletApanha' : 'palletPulmao', pos);
+  novo.root.rotation.y = rotY;
+  select(novo);
+});
+document.getElementById('edit-close').addEventListener('click', deselect);
+
+// ============ TOOLBAR ============
+document.querySelectorAll('.tb-btn[data-add]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.getAttribute('data-add');
+    const spawnPos = controls.target.clone();
+    spawnPos.y = 0;
+    const entry = addObject(type, spawnPos);
+    select(entry);
+  });
+});
+document.getElementById('btn-dup').addEventListener('click', () => {
+  if (!selected) return;
+  const clone = duplicateObject(selected);
+  select(clone);
+});
+document.getElementById('btn-del').addEventListener('click', () => {
+  if (!selected) return;
+  removeObject(selected);
+});
+
+// ============ SALVAR / CARREGAR ============
+document.getElementById('btn-save').addEventListener('click', () => {
+  const data = objects.map(e => ({
+    id: e.id, type: e.type,
+    position: [e.root.position.x, e.root.position.y, e.root.position.z],
+    rotationY: e.root.rotation.y,
+    dims: e.root.userData.dims || null,
+    cubagem: e.root.userData.cubagem || null
+  }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'layout_cd.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('btn-load').addEventListener('click', () => document.getElementById('file-load').click());
+document.getElementById('file-load').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      objects.slice().forEach(removeObject);
+      idCounter = 1;
+      data.forEach(item => {
+        const entry = addObject(item.type, new THREE.Vector3(item.position[0], item.position[1], item.position[2]));
+        entry.root.rotation.y = item.rotationY || 0;
+        if (item.dims && entry.root.userData.dims) {
+          entry.root.userData.dims.len = item.dims.len;
+          const mesh = entry.root.children[0];
+          mesh.geometry.dispose();
+          if (entry.type === 'longarina') mesh.geometry = new THREE.BoxGeometry(item.dims.len, 0.2, 0.12);
+          if (entry.type === 'parede') mesh.geometry = new THREE.BoxGeometry(item.dims.len, 3, 0.2);
+        }
+        if (item.cubagem && entry.type === 'palletPulmao') {
+          entry.root.userData.cubagem = item.cubagem;
+          const wrap = entry.root.getObjectByName('wrap');
+          const h = Math.max(0.3, item.cubagem/100);
+          wrap.geometry.dispose();
+          wrap.geometry = new THREE.BoxGeometry(1.0, h, 0.8);
+          wrap.position.y = 0.13 + h/2;
+        }
       });
+    } catch (err) {
+      alert('Erro ao ler o arquivo JSON: ' + err.message);
     }
-  }
-}
-buildStorageRows(6, 46, 11, 40, 7, [0, 2.4, 4.8]);
-buildStorageRows(24, 44, 41, 45.5, 5, [0, 2.4]);
-addLabel('RACKS PRINCIPAIS', -BW/2 + 26, 8, -BD/2 + 25, '#4C8FD1');
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
 
-// Uprights instanciados (uma unica malha para todas as colunas)
-const uprightInst = new THREE.InstancedMesh(uprightGeo, blueMat, uprightMatrices.length);
-uprightMatrices.forEach((m, i) => uprightInst.setMatrixAt(i, m));
-scene.add(uprightInst);
-
-// --- DOCAS ---
-addZone(6, 41, 22, 46, 0x14171a, 0.08);
-const doorMat = new THREE.MeshStandardMaterial({ color: 0x0d0f11 });
-const doorGeo = new THREE.BoxGeometry(1.5, 2.4, 0.3);
-const doorInst = new THREE.InstancedMesh(doorGeo, doorMat, 7);
-{
-  const m = new THREE.Matrix4();
-  for (let i=0; i<7; i++) {
-    const dx = -BW/2 + 6 + 1.5 + i*2.1;
-    m.compose(new THREE.Vector3(dx, 1.2, -BD/2 + 41 - 0.15), new THREE.Quaternion(), new THREE.Vector3(1,1,1));
-    doorInst.setMatrixAt(i, m);
-  }
-  scene.add(doorInst);
-}
-addLabel('DOCAS', -BW/2 + 14, 4, -BD/2 + 48, '#E8564F');
-
-// --- PATIO / CROSS-DOCK ---
-addZone(50, 14, BW-4, BD-3, 0x272c30, 0.06);
-addLabel('PATIO / CROSS-DOCK', -BW/2 + 70, 6, -BD/2 + 19, '#3DCB82');
-const laneMat = new THREE.LineBasicMaterial({ color: 0x3DCB82 });
-for (let i=0; i<6; i++) {
-  const z = -BD/2 + 28 + i*2.2;
-  const geo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-BW/2 + 52, 0.05, z), new THREE.Vector3(-BW/2 + BW-6, 0.05, z)
-  ]);
-  scene.add(new THREE.Line(geo, laneMat));
-}
-const doorInst2 = new THREE.InstancedMesh(new THREE.BoxGeometry(2.0, 2.6, 0.3), doorMat, 10);
-{
-  const m = new THREE.Matrix4();
-  for (let i=0; i<10; i++) {
-    const dx = -BW/2 + 54 + i*3.0;
-    m.compose(new THREE.Vector3(dx, 1.3, -BD/2 + BD - 3.15), new THREE.Quaternion(), new THREE.Vector3(1,1,1));
-    doorInst2.setMatrixAt(i, m);
-  }
-  scene.add(doorInst2);
-}
-
-// --- Contorno do predio ---
-const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a5158, roughness: 0.8, side: THREE.DoubleSide });
-function addWall(x0, z0, x1, z1) {
-  const len = Math.hypot(x1-x0, z1-z0);
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(len, 8, 0.3), wallMat);
-  wall.position.set(-BW/2 + (x0+x1)/2, 4, -BD/2 + (z0+z1)/2);
-  wall.rotation.y = -Math.atan2(z1-z0, x1-x0);
-  scene.add(wall);
-}
-addWall(0, 0, BW, 0); addWall(0, BD, BW, BD);
-addWall(0, 0, 0, BD); addWall(BW, 0, BW, BD);
-
-// ============ MODO DE EDICAO (Projeto 15 - base) ============
+// ============ INTERACAO: SELECIONAR E ARRASTAR ============
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-const panel = document.getElementById('panel');
-const panelAddr = document.getElementById('panel-addr');
-const panelLevel = document.getElementById('panel-level');
-const hoverTag = document.getElementById('hover-tag');
-let selected = null;
+const dragPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+const dragOffset = new THREE.Vector3();
+let isDragging = false;
+let pointerDownPos = null;
 
-function refreshPanel() {
-  if (!selected) return;
-  panelAddr.textContent = selected.userData.addr;
-  panelLevel.textContent = selected.userData.kind === 'pulmao' ? 'PULMAO' : 'APANHA';
-  document.getElementById('edit-y').value = selected.position.y.toFixed(2);
-  document.getElementById('edit-y-out').textContent = selected.position.y.toFixed(2) + ' m';
-  const cub = selected.userData.kind === 'pulmao' ? (selected.userData.cubagem || 90) : 0;
-  document.getElementById('edit-cub').value = cub;
-  document.getElementById('edit-cub-out').textContent = cub + ' cm';
-  document.getElementById('edit-cub-row').style.display = selected.userData.kind === 'pulmao' ? 'flex' : 'none';
+function getRoot(obj) {
+  let o = obj;
+  while (o.parent && !o.userData.isEditable) o = o.parent;
+  return o.userData.isEditable ? o : null;
 }
 
-function onClick(event) {
+function screenToMouse(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+  pointerDownPos = { x: event.clientX, y: event.clientY };
+  screenToMouse(event);
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects(bays, true);
+  const roots = objects.map(o => o.root);
+  const hits = raycaster.intersectObjects(roots, true);
   if (hits.length > 0) {
-    let obj = hits[0].object;
-    while (obj.parent && !obj.userData.addr) obj = obj.parent;
-    if (obj.userData.addr) {
-      selected = obj;
-      panel.style.display = 'block';
-      hoverTag.textContent = obj.userData.addr;
-      refreshPanel();
+    const root = getRoot(hits[0].object);
+    if (root) {
+      const entry = objects.find(o => o.root === root);
+      select(entry);
+      dragPlane.constant = -root.position.y;
+      const hitPoint = new THREE.Vector3();
+      raycaster.ray.intersectPlane(dragPlane, hitPoint);
+      dragOffset.copy(root.position).sub(hitPoint);
+      isDragging = true;
+      controls.enabled = false;
     }
   }
-}
-renderer.domElement.addEventListener('click', onClick);
-
-document.getElementById('edit-y').addEventListener('input', (e) => {
-  if (!selected) return;
-  const y = parseFloat(e.target.value);
-  selected.position.y = y;
-  document.getElementById('edit-y-out').textContent = y.toFixed(2) + ' m';
 });
 
-document.getElementById('edit-cub').addEventListener('input', (e) => {
-  if (!selected || selected.userData.kind !== 'pulmao') return;
-  const cm = parseFloat(e.target.value);
-  selected.userData.cubagem = cm;
-  document.getElementById('edit-cub-out').textContent = cm + ' cm';
-  const wrap = selected.getObjectByName('wrap');
-  if (wrap) {
-    const h = Math.max(0.3, cm / 100);
-    wrap.geometry.dispose();
-    wrap.geometry = new THREE.BoxGeometry(1.0, h, 0.8);
-    wrap.position.y = 0.12 + h/2;
+renderer.domElement.addEventListener('pointermove', (event) => {
+  if (!isDragging || !selected) return;
+  screenToMouse(event);
+  raycaster.setFromCamera(mouse, camera);
+  const hitPoint = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+    selected.root.position.x = hitPoint.x + dragOffset.x;
+    selected.root.position.z = hitPoint.z + dragOffset.z;
+    document.getElementById('p-x').value = selected.root.position.x;
+    document.getElementById('p-x-out').textContent = selected.root.position.x.toFixed(1);
+    document.getElementById('p-z').value = selected.root.position.z;
+    document.getElementById('p-z-out').textContent = selected.root.position.z.toFixed(1);
+    refreshOutline();
   }
 });
 
-document.getElementById('edit-swap').addEventListener('click', () => {
-  if (!selected) return;
-  const addr = selected.userData.addr;
-  const x = selected.position.x, y = selected.userData.baseSlotY, z = selected.position.z;
-  const wasKind = selected.userData.kind;
-  scene.remove(selected);
-  bays.splice(bays.indexOf(selected), 1);
-  const novo = wasKind === 'pulmao' ? makeApanhaPallet() : makePulmaoPallet(100);
-  novo.position.set(x, y + 0.8, z);
-  novo.userData.addr = addr;
-  novo.userData.kind = wasKind === 'pulmao' ? 'apanha' : 'pulmao';
-  novo.userData.levelY = y;
-  novo.userData.baseSlotY = y;
-  scene.add(novo);
-  bays.push(novo);
-  selected = novo;
-  refreshPanel();
-});
-
-document.getElementById('edit-close').addEventListener('click', () => {
-  selected = null;
-  panel.style.display = 'none';
+window.addEventListener('pointerup', (event) => {
+  if (isDragging) {
+    isDragging = false;
+    controls.enabled = true;
+  } else if (pointerDownPos) {
+    const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
+    if (moved < 4) {
+      // clique simples sem arrastar e sem acertar objeto -> deseleciona
+      screenToMouse(event);
+      raycaster.setFromCamera(mouse, camera);
+      const roots = objects.map(o => o.root);
+      const hits = raycaster.intersectObjects(roots, true);
+      if (hits.length === 0) deselect();
+    }
+  }
+  pointerDownPos = null;
 });
 
 window.addEventListener('resize', () => {
