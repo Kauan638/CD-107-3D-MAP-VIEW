@@ -2,55 +2,64 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Editor 3D CD - Projeto 15</title>
-<link rel="stylesheet" href="style.css?v=5">
+<title>Visualizador 3D de Endereços - CD</title>
+<link rel="stylesheet" href="style.css?v=1">
 </head>
 <body>
 <div id="app">
-  <div id="toolbar">
-    <div class="tb-title">ADICIONAR</div>
-    <button class="tb-btn" data-add="coluna">+ Coluna</button>
-    <button class="tb-btn" data-add="longarina">+ Longarina</button>
-    <button class="tb-btn accent" data-add="portaPallet">+ Porta-pallet pronto</button>
-    <button class="tb-btn" data-add="palletPulmao">+ Pallet pulmão</button>
-    <button class="tb-btn" data-add="palletApanha">+ Pallet apanha</button>
-    <button class="tb-btn" data-add="caixa">+ Caixa</button>
-    <button class="tb-btn" data-add="parede">+ Parede</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-dup" disabled>Duplicar selecionado</button>
-    <button class="tb-btn danger" id="btn-del" disabled>Excluir selecionado</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn accent" id="btn-save">Salvar layout (JSON)</button>
-    <button class="tb-btn" id="btn-load">Carregar layout</button>
-    <input type="file" id="file-load" accept=".json" style="display:none">
-  </div>
 
-  <div id="hud">
-    <h1>EDITOR 3D — CD (PROJETO 15)</h1>
-    <p>Piso de referência já montado (sorter, racks, docas, pátio). Adicione peças pela barra à esquerda — o porta-pallet pronto já vem com colunas e longarinas nos 3 níveis. Arraste no chão pra posicionar.</p>
-  </div>
+  <!-- TELA DE SELECAO -->
+  <div id="select-screen">
+    <div class="select-box">
+      <h1>VISUALIZADOR 3D DE ENDEREÇOS</h1>
+      <p id="select-hint">Carregue o arquivo "Posição de endereços.txt" (exportado do WMS) pra habilitar os pavilhões.</p>
 
-  <div id="controls">arraste vazio: girar · scroll: zoom · botão direito: pan · arraste um objeto selecionado: move no chão</div>
+      <label class="file-btn" id="file-label">
+        Selecionar arquivo de posição de endereços
+        <input type="file" id="file-input" accept=".txt" style="display:none">
+      </label>
+      <div id="load-status"></div>
 
-  <div id="panel">
-    <div class="panel-head">
-      <div class="label" id="panel-type">-</div>
-      <button id="edit-close" class="icon-btn">×</button>
+      <div id="pav-grid" class="pav-grid">
+        <button class="pav-card" data-pav="Pavilhao 1" disabled>
+          <div class="pav-name">Pavilhão 1</div>
+          <div class="pav-count" id="count-Pavilhao1">-</div>
+        </button>
+        <button class="pav-card" data-pav="Pavilhao 2" disabled>
+          <div class="pav-name">Pavilhão 2</div>
+          <div class="pav-count" id="count-Pavilhao2">-</div>
+        </button>
+        <button class="pav-card" data-pav="Pavilhao 3" disabled>
+          <div class="pav-name">Pavilhão 3</div>
+          <div class="pav-count" id="count-Pavilhao3">-</div>
+        </button>
+        <button class="pav-card" data-pav="Perecivel" disabled>
+          <div class="pav-name">Perecível</div>
+          <div class="pav-count" id="count-Perecivel">-</div>
+        </button>
+      </div>
     </div>
-
-    <div class="edit-row"><label>X</label><input type="range" id="p-x" min="-40" max="40" step="0.1"><span id="p-x-out">-</span></div>
-    <div class="edit-row"><label>Y (altura)</label><input type="range" id="p-y" min="0" max="8" step="0.05"><span id="p-y-out">-</span></div>
-    <div class="edit-row"><label>Z</label><input type="range" id="p-z" min="-30" max="30" step="0.1"><span id="p-z-out">-</span></div>
-    <div class="edit-row"><label>Rotação</label><input type="range" id="p-rot" min="0" max="360" step="5"><span id="p-rot-out">-</span></div>
-    <div class="edit-row" id="row-len"><label>Comprimento</label><input type="range" id="p-len" min="0.5" max="12" step="0.1"><span id="p-len-out">-</span></div>
-    <div class="edit-row" id="row-cub"><label>Cubagem</label><input type="range" id="p-cub" min="30" max="220" step="5"><span id="p-cub-out">-</span></div>
-
-    <button id="edit-swap" class="full-btn" style="display:none">Trocar apanha ↔ pulmão</button>
   </div>
+
+  <!-- TELA 3D -->
+  <div id="scene-screen" style="display:none">
+    <div id="hud">
+      <button id="btn-back">← voltar</button>
+      <h1 id="scene-title">-</h1>
+      <p id="scene-sub">-</p>
+    </div>
+    <div id="legend">
+      <div class="row"><div class="sw" style="background:#B5895A"></div>Apanha</div>
+      <div class="row"><div class="sw" style="background:#D8C9A3"></div>Pulmão</div>
+    </div>
+    <div id="controls">arraste: girar · scroll: zoom · botão direito: pan · clique: detalhes do endereço</div>
+    <div id="panel"></div>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="script.js?v=5"></script>
+<script src="script.js?v=1"></script>
 </body>
 </html>

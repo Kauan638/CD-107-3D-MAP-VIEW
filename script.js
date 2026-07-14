@@ -1,621 +1,315 @@
-/* Projeto 15 - Editor 3D livre do CD */
+/* Visualizador 3D de enderecos reais - Projeto 15 */
 window.addEventListener('error', function(e) {
   var el = document.getElementById('app');
   var msg = document.createElement('div');
   msg.id = 'error-msg';
-  msg.textContent = 'Erro ao carregar: ' + e.message;
+  msg.textContent = 'Erro: ' + e.message;
   el.appendChild(msg);
 });
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x14181C);
-
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 500);
-camera.position.set(55, 42, 65);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-renderer.shadowMap.enabled = false;
-document.getElementById('app').appendChild(renderer.domElement);
-
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.1;
-controls.target.set(0, 2, 0);
-controls.minDistance = 3;
-controls.maxDistance = 220;
-controls.maxPolarAngle = Math.PI * 0.49;
-
-scene.add(new THREE.HemisphereLight(0x9fb8d9, 0x1a1d20, 0.9));
-const key = new THREE.DirectionalLight(0xfff2df, 0.85);
-key.position.set(40, 60, 30);
-scene.add(key);
-const rim = new THREE.DirectionalLight(0x6f9fd8, 0.4);
-rim.position.set(-30, 20, -40);
-scene.add(rim);
-scene.add(new THREE.AmbientLight(0xffffff, 0.25));
-
-// --- Texturas procedurais ---
-function makeBoxTexture() {
-  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
-  const g = c.getContext('2d');
-  const grad = g.createLinearGradient(0,0,0,128);
-  grad.addColorStop(0, '#C9A876'); grad.addColorStop(1, '#AD8A5C');
-  g.fillStyle = grad; g.fillRect(0,0,128,128);
-  g.fillStyle = 'rgba(0,0,0,0.06)';
-  for (let i=0; i<128; i+=4) g.fillRect(0,i,128,1);
-  g.fillStyle = '#8a6d45'; g.fillRect(56,0,16,128);
-  g.strokeStyle = 'rgba(0,0,0,0.2)'; g.lineWidth = 3; g.strokeRect(1,1,126,126);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  return t;
-}
-function makeWoodTexture() {
-  const c = document.createElement('canvas'); c.width = 128; c.height = 32;
-  const g = c.getContext('2d');
-  g.fillStyle = '#8a6a45'; g.fillRect(0,0,128,32);
-  for (let i=0; i<6; i++) {
-    g.fillStyle = i%2===0 ? 'rgba(60,42,24,0.25)' : 'rgba(160,124,80,0.2)';
-    g.fillRect(0, i*5.3, 128, 2);
-  }
-  g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2; g.strokeRect(0,0,128,32);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,1);
-  return t;
-}
-function makeWrapTexture() {
-  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#DCCFA8'; g.fillRect(0,0,128,128);
-  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 4;
-  for (let i=-128; i<128; i+=18) { g.beginPath(); g.moveTo(i,128); g.lineTo(i+128,0); g.stroke(); }
-  return new THREE.CanvasTexture(c);
-}
-function makeBeamTexture() {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 32;
-  const g = c.getContext('2d');
-  g.fillStyle = '#E2571C'; g.fillRect(0,0,64,32);
-  g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(0,4,64,3);
-  g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0,25,64,3);
-  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping;
-  return t;
-}
-function makeUprightTexture() {
-  const c = document.createElement('canvas'); c.width = 32; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#1e4d8c'; g.fillRect(0,0,32,128);
-  g.fillStyle = 'rgba(0,0,0,0.35)';
-  for (let i=6; i<128; i+=14) g.fillRect(13,i,6,4);
-  g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(2,0,3,128);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1,3);
-  return t;
-}
-function makeFloorTexture() {
-  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = '#33383d'; g.fillRect(0,0,256,256);
-  for (let i=0; i<900; i++) {
-    g.fillStyle = `rgba(${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()*0.03})`;
-    g.fillRect(Math.random()*256, Math.random()*256, 2, 2);
-  }
-  g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2; g.strokeRect(0,0,256,256);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(20,20);
-  return t;
-}
-function makeWallTexture() {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
-  const g = c.getContext('2d');
-  g.fillStyle = '#4a5158'; g.fillRect(0,0,64,64);
-  g.strokeStyle = 'rgba(0,0,0,0.2)'; g.lineWidth = 2;
-  g.strokeRect(0,0,64,32); g.strokeRect(0,32,64,32);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  return t;
+// --- Classificacao de pavilhao por CODRUA (mapeamento oficial) ---
+function classifyRua(codruaStr) {
+  const r = parseInt(codruaStr, 10);
+  if (isNaN(r)) return null;
+  if ((r >= 26 && r <= 27) || (r >= 29 && r <= 31)) return 'Perecivel';
+  if ((r >= 3 && r <= 14) || (r >= 21 && r <= 24) || (r >= 51 && r <= 65)) return 'Pavilhao 1';
+  if (r >= 71 && r <= 106) return 'Pavilhao 2';
+  if (r >= 311 && r <= 317) return 'Pavilhao 3';
+  return null;
 }
 
-const boxTexture = makeBoxTexture();
-const woodTexture = makeWoodTexture();
-const wrapTexture = makeWrapTexture();
-const beamTexture = makeBeamTexture();
-const uprightTexture = makeUprightTexture();
-const wallTexture = makeWallTexture();
-
-// --- Chão geral (editor livre) ---
-const floorMat = new THREE.MeshStandardMaterial({ map: makeFloorTexture(), roughness: 0.92 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), floorMat);
-floor.rotation.x = -Math.PI/2;
-floor.position.y = -0.01;
-scene.add(floor);
-scene.add(new THREE.GridHelper(220, 110, 0x2a3138, 0x1e2327));
-
-// --- Piso de referencia do CD (zonas fixas, apenas contexto visual, nao editavel) ---
-const BW = 90, BD = 50;
-function addZone(x0, z0, x1, z1, color, height) {
-  const w = x1 - x0, d = z1 - z0;
-  const cx = -BW/2 + (x0 + x1)/2, cz = -BD/2 + (z0 + z1)/2;
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), new THREE.MeshStandardMaterial({ color, roughness: 0.85 }));
-  mesh.position.set(cx, height/2, cz);
-  scene.add(mesh);
-}
-function addLabel(text, x, y, z, color) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgba(20,24,28,0.85)'; ctx.fillRect(0,0,256,64);
-  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(1,1,254,62);
-  ctx.fillStyle = color; ctx.font = '600 22px Arial';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, 128, 32);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
-  sprite.scale.set(9, 2.25, 1);
-  sprite.position.set(x, y, z);
-  scene.add(sprite);
-}
-addZone(0, 0, BW, BD, 0x24282c, 0.04); // base do predio
-addZone(6, 2, BW-16, 8, 0x3a3020, 0.05);
-addLabel('SORTER', -BW/2 + 40, 4, -BD/2 + 5, '#F2A93B');
-addZone(6, 11, 46, 40, 0x1c2634, 0.05);
-addLabel('RACKS PRINCIPAIS', -BW/2 + 26, 4, -BD/2 + 25, '#4C8FD1');
-addZone(6, 41, 22, 46, 0x2a1c1c, 0.05);
-addLabel('DOCAS', -BW/2 + 14, 4, -BD/2 + 48, '#E8564F');
-addZone(50, 14, BW-4, BD-3, 0x1c2a20, 0.05);
-addLabel('PATIO / CROSS-DOCK', -BW/2 + 70, 4, -BD/2 + 19, '#3DCB82');
-
-const wallRefMat = new THREE.MeshStandardMaterial({ color: 0x4a5158, roughness: 0.8 });
-function addRefWall(x0, z0, x1, z1) {
-  const len = Math.hypot(x1-x0, z1-z0);
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(len, 6, 0.25), wallRefMat);
-  wall.position.set(-BW/2 + (x0+x1)/2, 3, -BD/2 + (z0+z1)/2);
-  wall.rotation.y = -Math.atan2(z1-z0, x1-x0);
-  scene.add(wall);
-}
-addRefWall(0, 0, BW, 0); addRefWall(0, BD, BW, BD);
-addRefWall(0, 0, 0, BD); addRefWall(BW, 0, BW, BD);
-
-// --- Materiais reutilizaveis ---
-const blueMat = new THREE.MeshStandardMaterial({ map: uprightTexture, metalness: 0.3, roughness: 0.55 });
-const orangeMat = new THREE.MeshStandardMaterial({ map: beamTexture, metalness: 0.25, roughness: 0.5 });
-const wrapMat = new THREE.MeshStandardMaterial({ map: wrapTexture, roughness: 0.35, metalness: 0.05, transparent:true, opacity:0.94 });
-const boxMat = new THREE.MeshStandardMaterial({ map: boxTexture, roughness: 0.9 });
-const palletMat = new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.95 });
-const wallMat = new THREE.MeshStandardMaterial({ map: wallTexture, roughness: 0.85 });
-const selectOutlineMat = new THREE.MeshBasicMaterial({ color: 0xF2A93B, wireframe: true });
-
-// ============ FABRICAS DE OBJETOS ============
-let idCounter = 1;
-
-function makePalletBase() {
-  const group = new THREE.Group();
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.05, 0.85), palletMat);
-  deck.position.y = 0.1;
-  group.add(deck);
-  for (let i=0; i<4; i++) {
-    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.09, 0.13), palletMat);
-    slat.position.set(0, 0.045, -0.36 + i*0.24);
-    group.add(slat);
-  }
-  return group;
+function parseTipend(str) {
+  if (!str) return null;
+  const m = str.match(/([\d,]+)\s*M/i);
+  if (!m) return null;
+  return parseFloat(m[1].replace(',', '.'));
 }
 
-const FACTORIES = {
-  coluna: () => {
-    const h = 3;
-    const g = new THREE.Group();
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, h, 0.14), blueMat);
-    m.position.y = h/2;
-    g.add(m);
-    g.userData.dims = { h };
-    return g;
-  },
-  longarina: () => {
-    const len = 2.4;
-    const g = new THREE.Group();
-    const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, 0.12), orangeMat);
-    g.add(m);
-    g.userData.dims = { len };
-    return g;
-  },
-  palletPulmao: () => {
-    const cub = 100;
-    const g = makePalletBase();
-    const h = cub/100;
-    const wrap = new THREE.Mesh(new THREE.BoxGeometry(1.0, h, 0.8), wrapMat);
-    wrap.position.y = 0.13 + h/2;
-    wrap.name = 'wrap';
-    g.add(wrap);
-    g.userData.cubagem = cub;
-    return g;
-  },
-  palletApanha: () => {
-    const g = makePalletBase();
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.6, 0.76), boxMat);
-    box.position.y = 0.13 + 0.3;
-    box.name = 'box';
-    g.add(box);
-    return g;
-  },
-  caixa: () => {
-    const g = new THREE.Group();
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), boxMat);
-    m.position.y = 0.25;
-    g.add(m);
-    g.userData.dims = { w:0.6, h:0.5, d:0.5 };
-    return g;
-  },
-  parede: () => {
-    const len = 6;
-    const g = new THREE.Group();
-    const m = new THREE.Mesh(new THREE.BoxGeometry(len, 3, 0.2), wallMat);
-    m.position.y = 1.5;
-    g.add(m);
-    g.userData.dims = { len };
-    return g;
-  },
-  portaPallet: () => {
-    // Modulo de porta-pallet pronto: 4 colunas + longarinas em 3 niveis
-    const bayW = 2.4, bayD = 1.1;
-    const levels = [0, 2.3, 4.6];
-    const colH = levels[levels.length-1] + 1.6;
-    const g = new THREE.Group();
-    const xs = [-bayW/2, bayW/2], zs = [-bayD/2, bayD/2];
-    xs.forEach(x => zs.forEach(z => {
-      const col = new THREE.Mesh(new THREE.BoxGeometry(0.12, colH, 0.12), blueMat);
-      col.position.set(x, colH/2, z);
-      g.add(col);
-    }));
-    levels.forEach(y => {
-      zs.forEach(z => {
-        const beam = new THREE.Mesh(new THREE.BoxGeometry(bayW, 0.2, 0.1), orangeMat);
-        beam.position.set(0, y + 0.6, z);
-        g.add(beam);
-      });
+// --- Parser do arquivo (ponto e virgula, latin1) ---
+let allRows = null; // { rua, predio, apto, sala, esp, codigo, desc, tipend, pav }
+
+function parseFile(text) {
+  const lines = text.split('\n');
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const c = line.split(';');
+    if (c.length < 16) continue;
+    const esp = c[7];
+    if (esp !== 'Apanha' && esp !== 'Pulmão') continue;
+    const rua = c[3];
+    const pav = classifyRua(rua);
+    if (!pav) continue;
+    rows.push({
+      rua: rua,
+      predio: parseInt(c[4], 10) || 0,
+      apto: parseInt(c[5], 10) || 0,
+      sala: parseInt(c[6], 10) || 0,
+      esp: esp,
+      codigo: c[8],
+      desc: c[9],
+      tipend: parseTipend(c[15]),
+      pav: pav
     });
-    g.userData.dims = { bayW, bayD, levels: levels.slice() };
-    g.userData.levelsY = levels.map(y => y + 0.8); // altura util pra encaixar pallet
-    return g;
   }
-};
-
-const objects = []; // { id, type, root }
-
-function addObject(type, pos) {
-  const factory = FACTORIES[type];
-  if (!factory) return null;
-  const root = factory();
-  root.userData.id = idCounter++;
-  root.userData.type = type;
-  root.userData.isEditable = true;
-  const p = pos || new THREE.Vector3((Math.random()-0.5)*4, 0, (Math.random()-0.5)*4);
-  root.position.copy(p);
-  scene.add(root);
-  const entry = { id: root.userData.id, type, root };
-  objects.push(entry);
-  return entry;
+  return rows;
 }
 
-function removeObject(entry) {
-  scene.remove(entry.root);
-  const idx = objects.indexOf(entry);
-  if (idx >= 0) objects.splice(idx, 1);
-  if (selected === entry) deselect();
-}
+// --- UI: tela de selecao ---
+const fileInput = document.getElementById('file-input');
+const loadStatus = document.getElementById('load-status');
+const pavCards = document.querySelectorAll('.pav-card');
 
-function duplicateObject(entry) {
-  const clone = entry.root.clone(true);
-  clone.userData.id = idCounter++;
-  clone.position.x += 1.0;
-  clone.position.z += 1.0;
-  scene.add(clone);
-  const newEntry = { id: clone.userData.id, type: entry.type, root: clone };
-  objects.push(newEntry);
-  return newEntry;
-}
-
-// ============ SELECAO / OUTLINE ============
-let selected = null;
-let outlineHelper = null;
-
-function makeOutline(root) {
-  const box = new THREE.Box3().setFromObject(root);
-  const size = new THREE.Vector3(); box.getSize(size);
-  const center = new THREE.Vector3(); box.getCenter(center);
-  const geo = new THREE.BoxGeometry(size.x*1.08 || 0.2, size.y*1.08 || 0.2, size.z*1.08 || 0.2);
-  const mesh = new THREE.Mesh(geo, selectOutlineMat);
-  mesh.position.copy(center);
-  return mesh;
-}
-
-function select(entry) {
-  deselect();
-  selected = entry;
-  outlineHelper = makeOutline(entry.root);
-  scene.add(outlineHelper);
-  document.getElementById('btn-dup').disabled = false;
-  document.getElementById('btn-del').disabled = false;
-  showPanel(entry);
-}
-
-function deselect() {
-  if (outlineHelper) { scene.remove(outlineHelper); outlineHelper = null; }
-  selected = null;
-  document.getElementById('btn-dup').disabled = true;
-  document.getElementById('btn-del').disabled = true;
-  document.getElementById('panel').style.display = 'none';
-}
-
-function refreshOutline() {
-  if (!selected || !outlineHelper) return;
-  const box = new THREE.Box3().setFromObject(selected.root);
-  const size = new THREE.Vector3(); box.getSize(size);
-  const center = new THREE.Vector3(); box.getCenter(center);
-  outlineHelper.geometry.dispose();
-  outlineHelper.geometry = new THREE.BoxGeometry(size.x*1.08 || 0.2, size.y*1.08 || 0.2, size.z*1.08 || 0.2);
-  outlineHelper.position.copy(center);
-}
-
-// ============ PAINEL LATERAL ============
-const panel = document.getElementById('panel');
-const typeLabels = { coluna:'COLUNA', longarina:'LONGARINA', portaPallet:'PORTA-PALLET', palletPulmao:'PALLET PULMÃO', palletApanha:'PALLET APANHA', caixa:'CAIXA', parede:'PAREDE' };
-
-function showPanel(entry) {
-  panel.style.display = 'block';
-  document.getElementById('panel-type').textContent = typeLabels[entry.type] + ' #' + entry.id;
-  document.getElementById('p-x').value = entry.root.position.x;
-  document.getElementById('p-x-out').textContent = entry.root.position.x.toFixed(1);
-  document.getElementById('p-y').value = entry.root.position.y;
-  document.getElementById('p-y-out').textContent = entry.root.position.y.toFixed(2);
-  document.getElementById('p-z').value = entry.root.position.z;
-  document.getElementById('p-z-out').textContent = entry.root.position.z.toFixed(1);
-  const rotDeg = THREE.MathUtils.radToDeg(entry.root.rotation.y);
-  document.getElementById('p-rot').value = ((rotDeg % 360) + 360) % 360;
-  document.getElementById('p-rot-out').textContent = Math.round(rotDeg) + '°';
-
-  const rowLen = document.getElementById('row-len');
-  const rowCub = document.getElementById('row-cub');
-  const swapBtn = document.getElementById('edit-swap');
-  rowLen.style.display = 'none'; rowCub.style.display = 'none'; swapBtn.style.display = 'none';
-
-  if (entry.type === 'longarina' || entry.type === 'parede') {
-    rowLen.style.display = 'flex';
-    const len = entry.root.userData.dims.len;
-    document.getElementById('p-len').min = entry.type === 'parede' ? 1 : 0.5;
-    document.getElementById('p-len').max = entry.type === 'parede' ? 20 : 6;
-    document.getElementById('p-len').value = len;
-    document.getElementById('p-len-out').textContent = len.toFixed(1) + 'm';
-  }
-  if (entry.type === 'palletPulmao') {
-    rowCub.style.display = 'flex';
-    const cub = entry.root.userData.cubagem || 100;
-    document.getElementById('p-cub').value = cub;
-    document.getElementById('p-cub-out').textContent = cub + ' cm';
-    swapBtn.style.display = 'block';
-  }
-  if (entry.type === 'palletApanha') {
-    swapBtn.style.display = 'block';
-  }
-}
-
-document.getElementById('p-x').addEventListener('input', e => {
-  if (!selected) return;
-  selected.root.position.x = parseFloat(e.target.value);
-  document.getElementById('p-x-out').textContent = parseFloat(e.target.value).toFixed(1);
-  refreshOutline();
-});
-document.getElementById('p-y').addEventListener('input', e => {
-  if (!selected) return;
-  selected.root.position.y = parseFloat(e.target.value);
-  document.getElementById('p-y-out').textContent = parseFloat(e.target.value).toFixed(2);
-  refreshOutline();
-});
-document.getElementById('p-z').addEventListener('input', e => {
-  if (!selected) return;
-  selected.root.position.z = parseFloat(e.target.value);
-  document.getElementById('p-z-out').textContent = parseFloat(e.target.value).toFixed(1);
-  refreshOutline();
-});
-document.getElementById('p-rot').addEventListener('input', e => {
-  if (!selected) return;
-  const deg = parseFloat(e.target.value);
-  selected.root.rotation.y = THREE.MathUtils.degToRad(deg);
-  document.getElementById('p-rot-out').textContent = Math.round(deg) + '°';
-  refreshOutline();
-});
-document.getElementById('p-len').addEventListener('input', e => {
-  if (!selected) return;
-  const len = parseFloat(e.target.value);
-  selected.root.userData.dims.len = len;
-  const mesh = selected.root.children[0];
-  mesh.geometry.dispose();
-  if (selected.type === 'longarina') {
-    mesh.geometry = new THREE.BoxGeometry(len, 0.2, 0.12);
-  } else {
-    mesh.geometry = new THREE.BoxGeometry(len, 3, 0.2);
-  }
-  document.getElementById('p-len-out').textContent = len.toFixed(1) + 'm';
-  refreshOutline();
-});
-document.getElementById('p-cub').addEventListener('input', e => {
-  if (!selected || selected.type !== 'palletPulmao') return;
-  const cm = parseFloat(e.target.value);
-  selected.root.userData.cubagem = cm;
-  document.getElementById('p-cub-out').textContent = cm + ' cm';
-  const wrap = selected.root.getObjectByName('wrap');
-  if (wrap) {
-    const h = Math.max(0.3, cm/100);
-    wrap.geometry.dispose();
-    wrap.geometry = new THREE.BoxGeometry(1.0, h, 0.8);
-    wrap.position.y = 0.13 + h/2;
-  }
-  refreshOutline();
-});
-document.getElementById('edit-swap').addEventListener('click', () => {
-  if (!selected) return;
-  const pos = selected.root.position.clone();
-  const rotY = selected.root.rotation.y;
-  const wasType = selected.type;
-  removeObject(selected);
-  const novo = addObject(wasType === 'palletPulmao' ? 'palletApanha' : 'palletPulmao', pos);
-  novo.root.rotation.y = rotY;
-  select(novo);
-});
-document.getElementById('edit-close').addEventListener('click', deselect);
-
-// ============ TOOLBAR ============
-document.querySelectorAll('.tb-btn[data-add]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const type = btn.getAttribute('data-add');
-    const spawnPos = controls.target.clone();
-    spawnPos.y = 0;
-    const entry = addObject(type, spawnPos);
-    select(entry);
-  });
-});
-document.getElementById('btn-dup').addEventListener('click', () => {
-  if (!selected) return;
-  const clone = duplicateObject(selected);
-  select(clone);
-});
-document.getElementById('btn-del').addEventListener('click', () => {
-  if (!selected) return;
-  removeObject(selected);
-});
-
-// ============ SALVAR / CARREGAR ============
-document.getElementById('btn-save').addEventListener('click', () => {
-  const data = objects.map(e => ({
-    id: e.id, type: e.type,
-    position: [e.root.position.x, e.root.position.y, e.root.position.z],
-    rotationY: e.root.rotation.y,
-    dims: e.root.userData.dims || null,
-    cubagem: e.root.userData.cubagem || null
-  }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'layout_cd.json';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-document.getElementById('btn-load').addEventListener('click', () => document.getElementById('file-load').click());
-document.getElementById('file-load').addEventListener('change', (e) => {
+fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  loadStatus.textContent = 'Lendo arquivo...';
   const reader = new FileReader();
   reader.onload = (ev) => {
-    try {
-      const data = JSON.parse(ev.target.result);
-      objects.slice().forEach(removeObject);
-      idCounter = 1;
-      data.forEach(item => {
-        const entry = addObject(item.type, new THREE.Vector3(item.position[0], item.position[1], item.position[2]));
-        entry.root.rotation.y = item.rotationY || 0;
-        if (item.dims && entry.root.userData.dims) {
-          entry.root.userData.dims.len = item.dims.len;
-          const mesh = entry.root.children[0];
-          mesh.geometry.dispose();
-          if (entry.type === 'longarina') mesh.geometry = new THREE.BoxGeometry(item.dims.len, 0.2, 0.12);
-          if (entry.type === 'parede') mesh.geometry = new THREE.BoxGeometry(item.dims.len, 3, 0.2);
-        }
-        if (item.cubagem && entry.type === 'palletPulmao') {
-          entry.root.userData.cubagem = item.cubagem;
-          const wrap = entry.root.getObjectByName('wrap');
-          const h = Math.max(0.3, item.cubagem/100);
-          wrap.geometry.dispose();
-          wrap.geometry = new THREE.BoxGeometry(1.0, h, 0.8);
-          wrap.position.y = 0.13 + h/2;
-        }
-      });
-    } catch (err) {
-      alert('Erro ao ler o arquivo JSON: ' + err.message);
-    }
+    loadStatus.textContent = 'Processando endereços...';
+    setTimeout(() => {
+      try {
+        allRows = parseFile(ev.target.result);
+        const counts = {};
+        allRows.forEach(r => { counts[r.pav] = (counts[r.pav]||0) + 1; });
+        document.getElementById('count-Pavilhao1').textContent = (counts['Pavilhao 1']||0).toLocaleString('pt-BR') + ' posições';
+        document.getElementById('count-Pavilhao2').textContent = (counts['Pavilhao 2']||0).toLocaleString('pt-BR') + ' posições';
+        document.getElementById('count-Pavilhao3').textContent = (counts['Pavilhao 3']||0).toLocaleString('pt-BR') + ' posições';
+        document.getElementById('count-Perecivel').textContent = (counts['Perecivel']||0).toLocaleString('pt-BR') + ' posições';
+        pavCards.forEach(btn => btn.disabled = false);
+        loadStatus.textContent = allRows.length.toLocaleString('pt-BR') + ' endereços carregados. Escolha um pavilhão.';
+      } catch (err) {
+        loadStatus.textContent = 'Erro ao processar: ' + err.message;
+      }
+    }, 30);
   };
-  reader.readAsText(file);
-  e.target.value = '';
+  reader.onerror = () => { loadStatus.textContent = 'Erro ao ler arquivo.'; };
+  reader.readAsText(file, 'iso-8859-1');
 });
 
-// ============ INTERACAO: SELECIONAR E ARRASTAR ============
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const dragPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
-const dragOffset = new THREE.Vector3();
-let isDragging = false;
-let pointerDownPos = null;
+pavCards.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!allRows) return;
+    const pav = btn.getAttribute('data-pav');
+    const rows = allRows.filter(r => r.pav === pav);
+    showScene(pav, rows);
+  });
+});
 
-function getRoot(obj) {
-  let o = obj;
-  while (o.parent && !o.userData.isEditable) o = o.parent;
-  return o.userData.isEditable ? o : null;
+document.getElementById('btn-back').addEventListener('click', () => {
+  document.getElementById('scene-screen').style.display = 'none';
+  document.getElementById('select-screen').style.display = 'flex';
+  disposeScene();
+});
+
+// ============ CENA 3D ============
+let renderer, scene, camera, controls, raycaster, mouse;
+let apanhaInst = null, pulmaoInst = null;
+let apanhaData = [], pulmaoData = [];
+let sceneInited = false;
+
+function initSceneOnce() {
+  if (sceneInited) return;
+  sceneInited = true;
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x14181C);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  document.getElementById('scene-screen').appendChild(renderer.domElement);
+  renderer.domElement.style.position = 'absolute';
+  renderer.domElement.style.top = '0';
+  renderer.domElement.style.left = '0';
+  renderer.domElement.style.zIndex = '1';
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+  controls.maxPolarAngle = Math.PI * 0.49;
+
+  scene.add(new THREE.HemisphereLight(0x9fb8d9, 0x1a1d20, 0.95));
+  const key = new THREE.DirectionalLight(0xfff2df, 0.8);
+  key.position.set(40, 60, 30);
+  scene.add(key);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+  renderer.domElement.addEventListener('click', onSceneClick);
+  window.addEventListener('resize', onResize);
+
+  animate();
 }
 
-function screenToMouse(event) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-}
-
-renderer.domElement.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0) return;
-  pointerDownPos = { x: event.clientX, y: event.clientY };
-  screenToMouse(event);
-  raycaster.setFromCamera(mouse, camera);
-  const roots = objects.map(o => o.root);
-  const hits = raycaster.intersectObjects(roots, true);
-  if (hits.length > 0) {
-    const root = getRoot(hits[0].object);
-    if (root) {
-      const entry = objects.find(o => o.root === root);
-      select(entry);
-      dragPlane.constant = -root.position.y;
-      const hitPoint = new THREE.Vector3();
-      raycaster.ray.intersectPlane(dragPlane, hitPoint);
-      dragOffset.copy(root.position).sub(hitPoint);
-      isDragging = true;
-      controls.enabled = false;
-    }
-  }
-});
-
-renderer.domElement.addEventListener('pointermove', (event) => {
-  if (!isDragging || !selected) return;
-  screenToMouse(event);
-  raycaster.setFromCamera(mouse, camera);
-  const hitPoint = new THREE.Vector3();
-  if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-    selected.root.position.x = hitPoint.x + dragOffset.x;
-    selected.root.position.z = hitPoint.z + dragOffset.z;
-    document.getElementById('p-x').value = selected.root.position.x;
-    document.getElementById('p-x-out').textContent = selected.root.position.x.toFixed(1);
-    document.getElementById('p-z').value = selected.root.position.z;
-    document.getElementById('p-z-out').textContent = selected.root.position.z.toFixed(1);
-    refreshOutline();
-  }
-});
-
-window.addEventListener('pointerup', (event) => {
-  if (isDragging) {
-    isDragging = false;
-    controls.enabled = true;
-  } else if (pointerDownPos) {
-    const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
-    if (moved < 4) {
-      // clique simples sem arrastar e sem acertar objeto -> deseleciona
-      screenToMouse(event);
-      raycaster.setFromCamera(mouse, camera);
-      const roots = objects.map(o => o.root);
-      const hits = raycaster.intersectObjects(roots, true);
-      if (hits.length === 0) deselect();
-    }
-  }
-  pointerDownPos = null;
-});
-
-window.addEventListener('resize', () => {
+function onResize() {
+  if (!camera) return;
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+}
 
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
+  if (controls) controls.update();
+  if (renderer && scene && camera) renderer.render(scene, camera);
 }
-animate();
+
+function disposeScene() {
+  if (apanhaInst) { scene.remove(apanhaInst); apanhaInst.geometry.dispose(); apanhaInst = null; }
+  if (pulmaoInst) { scene.remove(pulmaoInst); pulmaoInst.geometry.dispose(); pulmaoInst = null; }
+  const floor = scene.getObjectByName('floor');
+  if (floor) scene.remove(floor);
+  const grid = scene.getObjectByName('grid');
+  if (grid) scene.remove(grid);
+  apanhaData = []; pulmaoData = [];
+  document.getElementById('panel').style.display = 'none';
+}
+
+const RUA_SPACING = 2.4;
+const BAY_SPACING = 0.65;
+const FALLBACK_LEVEL_H = 1.4;
+const boxMatA = new THREE.MeshStandardMaterial({ color: 0xB5895A, roughness: 0.85 });
+const boxMatP = new THREE.MeshStandardMaterial({ color: 0xD8C9A3, roughness: 0.6, transparent:true, opacity:0.92 });
+const boxGeo = new THREE.BoxGeometry(0.55, 0.5, 0.5);
+const wrapGeo = new THREE.BoxGeometry(0.55, 1.1, 0.5);
+
+function showScene(pavKey, rows) {
+  document.getElementById('select-screen').style.display = 'none';
+  document.getElementById('scene-screen').style.display = 'block';
+  const overlay = document.createElement('div');
+  overlay.id = 'loading-overlay';
+  overlay.textContent = 'Montando ' + rows.length.toLocaleString('pt-BR') + ' posições...';
+  document.getElementById('scene-screen').appendChild(overlay);
+
+  setTimeout(() => {
+    initSceneOnce();
+    disposeScene();
+    buildLayout(pavKey, rows);
+    overlay.remove();
+  }, 30);
+}
+
+function buildLayout(pavKey, rows) {
+  const label = { 'Pavilhao 1':'Pavilhão 1', 'Pavilhao 2':'Pavilhão 2', 'Pavilhao 3':'Pavilhão 3', 'Perecivel':'Perecível' }[pavKey];
+  document.getElementById('scene-title').textContent = label;
+  const nA = rows.filter(r => r.esp === 'Apanha').length;
+  const nP = rows.filter(r => r.esp === 'Pulmão').length;
+  document.getElementById('scene-sub').textContent = rows.length.toLocaleString('pt-BR') + ' posições (' + nA.toLocaleString('pt-BR') + ' apanha, ' + nP.toLocaleString('pt-BR') + ' pulmão)';
+
+  // Ruas unicas ordenadas -> indice de linha (Z)
+  const ruas = Array.from(new Set(rows.map(r => r.rua))).sort((a,b) => parseInt(a,10) - parseInt(b,10));
+  const ruaIndex = new Map(ruas.map((r,i) => [r, i]));
+
+  // Predio min por rua, pra alinhar cada corredor perto da origem
+  const predioMinByRua = new Map();
+  rows.forEach(r => {
+    const cur = predioMinByRua.get(r.rua);
+    if (cur === undefined || r.predio < cur) predioMinByRua.set(r.rua, r.predio);
+  });
+
+  // Fallback de altura: ranking de APTO dentro de cada (rua,predio) quando falta TIPEND
+  const aptoRank = new Map(); // key `${rua}_${predio}` -> Map(apto -> index)
+  rows.forEach(r => {
+    const key = r.rua + '_' + r.predio;
+    if (!aptoRank.has(key)) aptoRank.set(key, new Set());
+    aptoRank.get(key).add(r.apto);
+  });
+  const aptoRankSorted = new Map();
+  aptoRank.forEach((set, key) => {
+    aptoRankSorted.set(key, Array.from(set).sort((a,b)=>a-b));
+  });
+
+  apanhaData = [];
+  pulmaoData = [];
+
+  const matA = new THREE.Matrix4();
+  const dummyPos = new THREE.Vector3(), dummyQuat = new THREE.Quaternion(), dummyScale = new THREE.Vector3(1,1,1);
+  const boundsMin = new THREE.Vector3(Infinity,Infinity,Infinity);
+  const boundsMax = new THREE.Vector3(-Infinity,-Infinity,-Infinity);
+
+  rows.forEach(r => {
+    const zi = ruaIndex.get(r.rua);
+    const z = zi * RUA_SPACING;
+    const pMin = predioMinByRua.get(r.rua) || 0;
+    const x = (r.predio - pMin) * BAY_SPACING;
+    let y;
+    if (r.tipend !== null) {
+      y = r.tipend;
+    } else {
+      const key = r.rua + '_' + r.predio;
+      const order = aptoRankSorted.get(key) || [r.apto];
+      const idx = order.indexOf(r.apto);
+      y = 0.4 + (idx >= 0 ? idx : 0) * FALLBACK_LEVEL_H;
+    }
+    const zOff = (r.sala % 4) * 0.14;
+    const pos = { x, y, z: z + zOff, addr: `RUA ${r.rua} / PRÉDIO ${r.predio} / APTO ${r.apto} / SALA ${r.sala}`, esp: r.esp, desc: r.desc, codigo: r.codigo };
+    if (r.esp === 'Apanha') apanhaData.push(pos); else pulmaoData.push(pos);
+    boundsMin.x = Math.min(boundsMin.x, x); boundsMax.x = Math.max(boundsMax.x, x);
+    boundsMin.y = Math.min(boundsMin.y, y); boundsMax.y = Math.max(boundsMax.y, y);
+    boundsMin.z = Math.min(boundsMin.z, z); boundsMax.z = Math.max(boundsMax.z, z);
+  });
+
+  if (apanhaData.length > 0) {
+    apanhaInst = new THREE.InstancedMesh(boxGeo, boxMatA, apanhaData.length);
+    apanhaData.forEach((d, i) => {
+      matA.compose(new THREE.Vector3(d.x, d.y, d.z), dummyQuat, dummyScale);
+      apanhaInst.setMatrixAt(i, matA);
+    });
+    scene.add(apanhaInst);
+  }
+  if (pulmaoData.length > 0) {
+    pulmaoInst = new THREE.InstancedMesh(wrapGeo, boxMatP, pulmaoData.length);
+    pulmaoData.forEach((d, i) => {
+      matA.compose(new THREE.Vector3(d.x, d.y, d.z), dummyQuat, dummyScale);
+      pulmaoInst.setMatrixAt(i, matA);
+    });
+    scene.add(pulmaoInst);
+  }
+
+  // Piso
+  const cx = (boundsMin.x + boundsMax.x)/2, cz = (boundsMin.z + boundsMax.z)/2;
+  const fw = (boundsMax.x - boundsMin.x) + 8, fd = (boundsMax.z - boundsMin.z) + 8;
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x2f3438, roughness: 0.95 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(fw, fd), floorMat);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.set(cx, -0.1, cz);
+  floor.name = 'floor';
+  scene.add(floor);
+  const grid = new THREE.GridHelper(Math.max(fw,fd), 40, 0x2a3138, 0x1e2327);
+  grid.position.set(cx, -0.09, cz);
+  grid.name = 'grid';
+  scene.add(grid);
+
+  // Camera fit
+  const spanX = boundsMax.x - boundsMin.x, spanZ = boundsMax.z - boundsMin.z, spanY = boundsMax.y - boundsMin.y;
+  const maxSpan = Math.max(spanX, spanZ, 10);
+  camera.position.set(cx + maxSpan*0.35, Math.max(spanY, 8) + maxSpan*0.4, cz + maxSpan*0.55);
+  controls.target.set(cx, (boundsMin.y+boundsMax.y)/2, cz);
+  controls.minDistance = 2;
+  controls.maxDistance = maxSpan * 3;
+  controls.update();
+}
+
+function onSceneClick(event) {
+  if (!apanhaInst && !pulmaoInst) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const targets = [apanhaInst, pulmaoInst].filter(Boolean);
+  const hits = raycaster.intersectObjects(targets);
+  const panel = document.getElementById('panel');
+  if (hits.length === 0) { panel.style.display = 'none'; return; }
+  const hit = hits[0];
+  const data = hit.object === apanhaInst ? apanhaData[hit.instanceId] : pulmaoData[hit.instanceId];
+  panel.style.display = 'block';
+  panel.innerHTML =
+    '<div class="l">Endereço</div><div class="v">' + data.addr + '</div>' +
+    '<div class="l">Espécie</div><div class="v">' + data.esp + '</div>' +
+    '<div class="l">Código</div><div class="v">' + (data.codigo || '-') + '</div>' +
+    '<div class="l">Descrição</div><div class="v">' + (data.desc || '(vazio)') + '</div>';
+}
