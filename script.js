@@ -11,7 +11,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x14181C);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 500);
-camera.position.set(20, 16, 24);
+camera.position.set(55, 42, 65);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -22,9 +22,9 @@ document.getElementById('app').appendChild(renderer.domElement);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.1;
-controls.target.set(0, 1, 0);
+controls.target.set(0, 2, 0);
 controls.minDistance = 3;
-controls.maxDistance = 160;
+controls.maxDistance = 220;
 controls.maxPolarAngle = Math.PI * 0.49;
 
 scene.add(new THREE.HemisphereLight(0x9fb8d9, 0x1a1d20, 0.9));
@@ -118,12 +118,57 @@ const beamTexture = makeBeamTexture();
 const uprightTexture = makeUprightTexture();
 const wallTexture = makeWallTexture();
 
-// --- Chão ---
+// --- Chão geral (editor livre) ---
 const floorMat = new THREE.MeshStandardMaterial({ map: makeFloorTexture(), roughness: 0.92 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), floorMat);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), floorMat);
 floor.rotation.x = -Math.PI/2;
+floor.position.y = -0.01;
 scene.add(floor);
-scene.add(new THREE.GridHelper(200, 100, 0x2a3138, 0x1e2327));
+scene.add(new THREE.GridHelper(220, 110, 0x2a3138, 0x1e2327));
+
+// --- Piso de referencia do CD (zonas fixas, apenas contexto visual, nao editavel) ---
+const BW = 90, BD = 50;
+function addZone(x0, z0, x1, z1, color, height) {
+  const w = x1 - x0, d = z1 - z0;
+  const cx = -BW/2 + (x0 + x1)/2, cz = -BD/2 + (z0 + z1)/2;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), new THREE.MeshStandardMaterial({ color, roughness: 0.85 }));
+  mesh.position.set(cx, height/2, cz);
+  scene.add(mesh);
+}
+function addLabel(text, x, y, z, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(20,24,28,0.85)'; ctx.fillRect(0,0,256,64);
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(1,1,254,62);
+  ctx.fillStyle = color; ctx.font = '600 22px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 32);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
+  sprite.scale.set(9, 2.25, 1);
+  sprite.position.set(x, y, z);
+  scene.add(sprite);
+}
+addZone(0, 0, BW, BD, 0x24282c, 0.04); // base do predio
+addZone(6, 2, BW-16, 8, 0x3a3020, 0.05);
+addLabel('SORTER', -BW/2 + 40, 4, -BD/2 + 5, '#F2A93B');
+addZone(6, 11, 46, 40, 0x1c2634, 0.05);
+addLabel('RACKS PRINCIPAIS', -BW/2 + 26, 4, -BD/2 + 25, '#4C8FD1');
+addZone(6, 41, 22, 46, 0x2a1c1c, 0.05);
+addLabel('DOCAS', -BW/2 + 14, 4, -BD/2 + 48, '#E8564F');
+addZone(50, 14, BW-4, BD-3, 0x1c2a20, 0.05);
+addLabel('PATIO / CROSS-DOCK', -BW/2 + 70, 4, -BD/2 + 19, '#3DCB82');
+
+const wallRefMat = new THREE.MeshStandardMaterial({ color: 0x4a5158, roughness: 0.8 });
+function addRefWall(x0, z0, x1, z1) {
+  const len = Math.hypot(x1-x0, z1-z0);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(len, 6, 0.25), wallRefMat);
+  wall.position.set(-BW/2 + (x0+x1)/2, 3, -BD/2 + (z0+z1)/2);
+  wall.rotation.y = -Math.atan2(z1-z0, x1-x0);
+  scene.add(wall);
+}
+addRefWall(0, 0, BW, 0); addRefWall(0, BD, BW, BD);
+addRefWall(0, 0, 0, BD); addRefWall(BW, 0, BW, BD);
 
 // --- Materiais reutilizaveis ---
 const blueMat = new THREE.MeshStandardMaterial({ map: uprightTexture, metalness: 0.3, roughness: 0.55 });
@@ -202,6 +247,29 @@ const FACTORIES = {
     m.position.y = 1.5;
     g.add(m);
     g.userData.dims = { len };
+    return g;
+  },
+  portaPallet: () => {
+    // Modulo de porta-pallet pronto: 4 colunas + longarinas em 3 niveis
+    const bayW = 2.4, bayD = 1.1;
+    const levels = [0, 2.3, 4.6];
+    const colH = levels[levels.length-1] + 1.6;
+    const g = new THREE.Group();
+    const xs = [-bayW/2, bayW/2], zs = [-bayD/2, bayD/2];
+    xs.forEach(x => zs.forEach(z => {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.12, colH, 0.12), blueMat);
+      col.position.set(x, colH/2, z);
+      g.add(col);
+    }));
+    levels.forEach(y => {
+      zs.forEach(z => {
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(bayW, 0.2, 0.1), orangeMat);
+        beam.position.set(0, y + 0.6, z);
+        g.add(beam);
+      });
+    });
+    g.userData.dims = { bayW, bayD, levels: levels.slice() };
+    g.userData.levelsY = levels.map(y => y + 0.8); // altura util pra encaixar pallet
     return g;
   }
 };
@@ -285,7 +353,7 @@ function refreshOutline() {
 
 // ============ PAINEL LATERAL ============
 const panel = document.getElementById('panel');
-const typeLabels = { coluna:'COLUNA', longarina:'LONGARINA', palletPulmao:'PALLET PULMÃO', palletApanha:'PALLET APANHA', caixa:'CAIXA', parede:'PAREDE' };
+const typeLabels = { coluna:'COLUNA', longarina:'LONGARINA', portaPallet:'PORTA-PALLET', palletPulmao:'PALLET PULMÃO', palletApanha:'PALLET APANHA', caixa:'CAIXA', parede:'PAREDE' };
 
 function showPanel(entry) {
   panel.style.display = 'block';
